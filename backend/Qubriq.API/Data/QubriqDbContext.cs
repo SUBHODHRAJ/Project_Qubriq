@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Qubriq.API.Models;
 
 namespace Qubriq.API.Data;
@@ -84,6 +84,20 @@ public class QubriqDbContext : DbContext
             entity.Property(x => x.Destination).HasMaxLength(250).IsRequired();
             entity.Property(x => x.Status).HasMaxLength(40).IsRequired();
 
+            // Booking details
+            entity.Property(x => x.CargoName).HasMaxLength(200).IsRequired(false);
+            entity.Property(x => x.CargoCategory).HasMaxLength(100);
+            entity.Property(x => x.PackageCount).IsRequired(false);
+            entity.Property(x => x.TotalWeightKg).HasPrecision(12, 2).IsRequired(false);
+            entity.Property(x => x.LengthCm).HasPrecision(12, 2);
+            entity.Property(x => x.WidthCm).HasPrecision(12, 2);
+            entity.Property(x => x.HeightCm).HasPrecision(12, 2);
+            entity.Property(x => x.IsFragile).IsRequired(false);
+            entity.Property(x => x.SpecialHandlingRequirements).HasMaxLength(500);
+            entity.Property(x => x.Priority).HasMaxLength(20).IsRequired(false);
+            entity.Property(x => x.PickupDateUtc).IsRequired(false);
+            entity.Property(x => x.DeliveryTimeWindow).HasMaxLength(100);
+            entity.Property(x => x.AdditionalInstructions).HasMaxLength(1000);
             entity.HasIndex(x => x.TrackingNumber).IsUnique();
 
             entity.HasOne(x => x.Customer)

@@ -5,8 +5,8 @@ Unified Logistics Operating System.
 ## Project
 
 Qubriq is being developed as a modular logistics operating platform.
-Development is organized into stages, with each stage verified before
-the next stage begins.
+Development is organized into stages, with each stage documented and
+verified before formal completion.
 
 ## Technology Stack
 
@@ -42,11 +42,13 @@ the next stage begins.
 |---|---|---|
 | Stage 0 | Initial project foundation and API setup | Completed |
 | Stage 1 | MySQL database foundation and EF Core schema | Completed; 8/8 cumulative tests passed |
-| Stage 2 | Not started | Awaiting approval |
+| Stage 2 | Booking API and Customer Management | Implemented; automated tests not run |
 
 ## Module Documentation
 
 - [Stage 1 - Database Foundation](modules/STAGE-1-DATABASE-FOUNDATION.md)
+- [Stage 2 - Customer Management](modules/STAGE-2-CUSTOMER-MANAGEMENT.md)
+- [Stage 2 - Booking Management API](modules/STAGE-2-BOOKING-API.md)
 
 ## Development and Testing
 
@@ -58,8 +60,9 @@ powershell -ExecutionPolicy Bypass -File .\tests\Run-Qubriq-Tests.ps1
 
 Default API test address: http://127.0.0.1:5080
 
-The test runner builds the frontend and backend, starts the API,
-and checks the API endpoints including database connectivity.
+The existing cumulative runner covers the previously completed
+foundation stages. Stage 2 Customer Management automated tests
+have not yet been added or executed.
 
 ## Security and Configuration
 
