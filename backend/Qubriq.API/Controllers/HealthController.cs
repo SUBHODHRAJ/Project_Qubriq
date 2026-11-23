@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Qubriq.API.Controllers;
 
@@ -14,7 +14,7 @@ public class HealthController : ControllerBase
             status = "Healthy",
             application = "Qubriq API",
             version = "0.1.0",
-            stage = 0,
+            stage = 1,
             timestampUtc = DateTime.UtcNow
         });
     }

@@ -28,3 +28,14 @@ tests/logs/
 # OS
 .DS_Store
 Thumbs.db
+
+# Local development backups - preserve locally, never commit
+*.backup
+*.bak
+docs/README.md.stage2-backup
+
+# Additional local backup directories
+backend/_Backups/
+*.before-*
+*.stage2-backup
+*.pre-stage2-update.ps1
