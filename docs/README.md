@@ -42,7 +42,7 @@ verified before formal completion.
 |---|---|---|
 | Stage 0 | Initial project foundation and API setup | Completed |
 | Stage 1 | MySQL database foundation and EF Core schema | Completed; 8/8 cumulative tests passed |
-| Stage 2 | Booking API and Customer Management | Implemented; automated tests not run |
+| Stage 2 | Booking, Customer Management and Booking Frontend | Implemented; 16/16 cumulative automated tests passed |
 
 ## Module Documentation
 

@@ -6,14 +6,10 @@ import NotFoundPage from "../pages/NotFoundPage";
 import DashboardLayout from "../layouts/DashboardLayout";
 import CommandCenterPage from "../pages/CommandCenterPage";
 import CustomersPage from "../pages/CustomersPage";
+import BookingsPage from "../pages/BookingsPage";
 import ModulePage from "../pages/ModulePage";
 
 const modules = [
-    {
-        path: "bookings",
-        title: "Booking & Order Management",
-        description: "Create and manage shipment bookings from request to dispatch."
-    },
     {
         path: "fleet",
         title: "Fleet & Capacity Planning",
@@ -82,6 +78,8 @@ function AppRoutes() {
                 <Route index element={<Navigate to="overview" replace />} />
                 <Route path="overview" element={<CommandCenterPage />} />
                 <Route path="customers" element={<CustomersPage />} />
+                <Route path="bookings" element={<BookingsPage />} />
+                <Route path="bookings/new" element={<BookingsPage />} />
 
                 {modules.map((module) => (
                     <Route

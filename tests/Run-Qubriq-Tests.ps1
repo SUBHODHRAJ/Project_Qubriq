@@ -1,6 +1,6 @@
-﻿# ============================================================
+# ============================================================
 # QUBRIQ - CUMULATIVE AUTOMATED TEST RUNNER
-# Stage 0 + Stage 1
+# Stage 0 + Stage 1 + Stage 2
 # Windows PowerShell 5.1 compatible
 # ============================================================
 
@@ -48,7 +48,7 @@ function Add-Result {
 
 Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "       QUBRIQ CUMULATIVE TESTS" -ForegroundColor Cyan
-Write-Host "             STAGE 0 + 1" -ForegroundColor Cyan
+Write-Host "             STAGE 0 + 1 + 2" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 
 try {
@@ -267,6 +267,205 @@ try {
     else {
         Add-Result "MySQL database connectivity" $false "Skipped: API unavailable."
     }
+
+
+    # STAGE 2 - CUSTOMER AND BOOKING TESTS
+
+    # TEST 9 - Stage 2 project structure
+
+    $Stage2Required = @(
+        "$Backend\Controllers\CustomersController.cs",
+        "$Backend\Controllers\BookingsController.cs",
+        "$Backend\DTOs\CreateCustomerRequest.cs",
+        "$Backend\DTOs\UpdateCustomerRequest.cs",
+        "$Backend\DTOs\UpdateCustomerStatusRequest.cs",
+        "$Backend\DTOs\CreateBookingRequest.cs",
+        "$Frontend\src\pages\CustomersPage.jsx",
+        "$Frontend\src\pages\BookingsPage.jsx",
+        "$Frontend\src\services\customerService.js",
+        "$Frontend\src\services\bookingService.js",
+        "$Frontend\src\styles\customers.css",
+        "$Frontend\src\styles\bookings.css",
+        "$Root\docs\modules\STAGE-2-CUSTOMER-MANAGEMENT.md",
+        "$Root\docs\modules\STAGE-2-BOOKING-API.md"
+    )
+
+    $Stage2Missing = @(
+        $Stage2Required | Where-Object { -not (Test-Path $_) }
+    )
+
+    Add-Result `
+        "Stage 2 project structure" `
+        ($Stage2Missing.Count -eq 0) `
+        $(if ($Stage2Missing.Count -eq 0) { "Customer and booking files exist." } else { "Missing: " + ($Stage2Missing -join "; ") })
+
+    if ($ApiReady) {
+
+        # TEST 10 - Customer listing
+
+        try {
+            $Customers = @(Invoke-RestMethod "$ApiUrl/api/customers")
+
+            $Valid = $true
+
+            foreach ($Customer in $Customers) {
+                if ($null -eq $Customer.id -or [string]::IsNullOrWhiteSpace([string]$Customer.companyName)) {
+                    $Valid = $false
+                    break
+                }
+            }
+
+            Add-Result "Customer listing API" $Valid "HTTP request succeeded; returned $($Customers.Count) customer record(s)."
+        }
+        catch {
+            Add-Result "Customer listing API" $false $_.Exception.Message
+        }
+
+        # TEST 11 - Active customer filter
+
+        try {
+            $ActiveCustomers = @(Invoke-RestMethod "$ApiUrl/api/customers?isActive=true")
+
+            $Valid = $true
+
+            foreach ($Customer in $ActiveCustomers) {
+                if ($Customer.isActive -ne $true) {
+                    $Valid = $false
+                    break
+                }
+            }
+
+            Add-Result "Active customer filter" $Valid "Returned $($ActiveCustomers.Count) active customer record(s)."
+        }
+        catch {
+            Add-Result "Active customer filter" $false $_.Exception.Message
+        }
+
+        # TEST 12 - Booking listing
+
+        try {
+            $Bookings = @(Invoke-RestMethod "$ApiUrl/api/bookings")
+
+            $Valid = $true
+
+            foreach ($Booking in $Bookings) {
+                if ($null -eq $Booking.id) {
+                    $Valid = $false
+                    break
+                }
+            }
+
+            Add-Result "Booking listing API" $Valid "HTTP request succeeded; returned $($Bookings.Count) booking record(s)."
+        }
+        catch {
+            Add-Result "Booking listing API" $false $_.Exception.Message
+        }
+
+        # TEST 13 - Booking status filter
+
+        try {
+            $FilteredBookings = @(
+                Invoke-RestMethod "$ApiUrl/api/bookings?status=Confirmed"
+            )
+
+            $Valid = $true
+
+            foreach ($Booking in $FilteredBookings) {
+                if ([string]$Booking.status -ne "Confirmed") {
+                    $Valid = $false
+                    break
+                }
+            }
+
+            Add-Result "Booking status filter" $Valid "Confirmed filter returned $($FilteredBookings.Count) matching booking record(s)."
+        }
+        catch {
+            Add-Result "Booking status filter" $false $_.Exception.Message
+        }
+
+        # TEST 14 - Booking customer selection API
+
+        try {
+            $BookingCustomers = @(
+                Invoke-RestMethod "$ApiUrl/api/bookings/customers"
+            )
+
+            $Valid = $true
+
+            foreach ($Customer in $BookingCustomers) {
+                if ($null -eq $Customer.id -or [string]::IsNullOrWhiteSpace([string]$Customer.companyName)) {
+                    $Valid = $false
+                    break
+                }
+            }
+
+            Add-Result "Booking customer selection API" $Valid "Returned $($BookingCustomers.Count) customer option(s)."
+        }
+        catch {
+            Add-Result "Booking customer selection API" $false $_.Exception.Message
+        }
+
+        # TEST 15 - Invalid customer submission must be rejected
+
+        try {
+            $Rejected = $false
+
+            try {
+                Invoke-RestMethod `
+                    -Uri "$ApiUrl/api/customers" `
+                    -Method Post `
+                    -ContentType "application/json" `
+                    -Body "{}" `
+                    -ErrorAction Stop | Out-Null
+            }
+            catch {
+                if ($null -ne $_.Exception.Response) {
+                    $StatusCode = [int]$_.Exception.Response.StatusCode
+                    $Rejected = ($StatusCode -eq 400)
+                }
+            }
+
+            Add-Result "Invalid customer submission validation" $Rejected "Empty JSON submission expected HTTP 400."
+        }
+        catch {
+            Add-Result "Invalid customer submission validation" $false $_.Exception.Message
+        }
+
+        # TEST 16 - Invalid booking submission must be rejected
+
+        try {
+            $Rejected = $false
+
+            try {
+                Invoke-RestMethod `
+                    -Uri "$ApiUrl/api/bookings" `
+                    -Method Post `
+                    -ContentType "application/json" `
+                    -Body "{}" `
+                    -ErrorAction Stop | Out-Null
+            }
+            catch {
+                if ($null -ne $_.Exception.Response) {
+                    $StatusCode = [int]$_.Exception.Response.StatusCode
+                    $Rejected = ($StatusCode -eq 400)
+                }
+            }
+
+            Add-Result "Invalid booking submission validation" $Rejected "Empty JSON submission expected HTTP 400."
+        }
+        catch {
+            Add-Result "Invalid booking submission validation" $false $_.Exception.Message
+        }
+    }
+    else {
+        Add-Result "Customer listing API" $false "Skipped: API unavailable."
+        Add-Result "Active customer filter" $false "Skipped: API unavailable."
+        Add-Result "Booking listing API" $false "Skipped: API unavailable."
+        Add-Result "Booking status filter" $false "Skipped: API unavailable."
+        Add-Result "Booking customer selection API" $false "Skipped: API unavailable."
+        Add-Result "Invalid customer submission validation" $false "Skipped: API unavailable."
+        Add-Result "Invalid booking submission validation" $false "Skipped: API unavailable."
+    }
 }
 finally {
 
@@ -288,7 +487,7 @@ $Failed = @($Results | Where-Object { $_.Result -eq "FAIL" }).Count
 
 $Report = [PSCustomObject]@{
     Project = "Qubriq"
-    Stage = 1
+    Stage = 2
     Date = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     TotalTests = $Results.Count
     Passed = $Passed
@@ -312,9 +511,9 @@ Write-Host "Failed : $Failed" -ForegroundColor Red
 Write-Host "`nReports: $Logs" -ForegroundColor Yellow
 
 if ($Failed -gt 0) {
-    Write-Host "`nSTAGE 1 FAILED" -ForegroundColor Red
+    Write-Host "`nCUMULATIVE TESTS FAILED" -ForegroundColor Red
     exit 1
 }
 
-Write-Host "`nSTAGE 1 PASSED" -ForegroundColor Green
+Write-Host "`nCUMULATIVE TESTS PASSED" -ForegroundColor Green
 exit 0
