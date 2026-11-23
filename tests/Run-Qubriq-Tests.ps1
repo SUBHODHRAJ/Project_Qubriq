@@ -1,8 +1,7 @@
-﻿
-# ============================================================
+﻿# ============================================================
 # QUBRIQ - CUMULATIVE AUTOMATED TEST RUNNER
-# Stage 0
-# Compatible with Windows PowerShell 5.1
+# Stage 0 + Stage 1
+# Windows PowerShell 5.1 compatible
 # ============================================================
 
 param(
@@ -20,6 +19,8 @@ New-Item -ItemType Directory -Path $Logs -Force | Out-Null
 
 $Results = @()
 $ApiProcess = $null
+$PreviousEnvironment = $env:ASPNETCORE_ENVIRONMENT
+$env:ASPNETCORE_ENVIRONMENT = "Development"
 
 function Add-Result {
     param(
@@ -45,198 +46,239 @@ function Add-Result {
     }
 }
 
-Write-Host "`n==================================" -ForegroundColor Cyan
-Write-Host "      QUBRIQ AUTOMATED TESTS" -ForegroundColor Cyan
-Write-Host "==================================" -ForegroundColor Cyan
-
-# TEST 1 - Project structure
-
-$Required = @(
-    "$Root\README.md",
-    "$Frontend\package.json",
-    "$Frontend\package-lock.json",
-    "$Frontend\index.html",
-    "$Frontend\src\main.jsx",
-    "$Frontend\src\App.jsx",
-    "$Backend\Qubriq.API.csproj",
-    "$Backend\Program.cs",
-    "$Backend\Controllers\HealthController.cs",
-    "$Root\docs\development\VERSIONS.txt"
-)
-
-$Missing = @($Required | Where-Object { -not (Test-Path $_) })
-
-if ($Missing.Count -eq 0) {
-    Add-Result "Project structure" $true "Required files exist."
-}
-else {
-    Add-Result "Project structure" $false ($Missing -join "; ")
-}
-
-# TEST 2 - Frontend build
-
-Push-Location $Frontend
+Write-Host "`n========================================" -ForegroundColor Cyan
+Write-Host "       QUBRIQ CUMULATIVE TESTS" -ForegroundColor Cyan
+Write-Host "             STAGE 0 + 1" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
 
 try {
-    $Output = npm run build 2>&1
-    $ExitCode = $LASTEXITCODE
 
-    $Output | Out-File "$Logs\frontend_build.log"
+    # TEST 1 - Project structure
 
-    $BuildPassed = (
-        $ExitCode -eq 0 -and
-        (Test-Path "$Frontend\dist\index.html")
+    $Required = @(
+        "$Root\README.md",
+        "$Frontend\package.json",
+        "$Frontend\package-lock.json",
+        "$Frontend\index.html",
+        "$Frontend\src\main.jsx",
+        "$Frontend\src\App.jsx",
+        "$Backend\Qubriq.API.csproj",
+        "$Backend\Program.cs",
+        "$Backend\Controllers\HealthController.cs",
+        "$Backend\Data\QubriqDbContext.cs",
+        "$Backend\Models\User.cs",
+        "$Backend\Models\Role.cs",
+        "$Backend\Models\UserRole.cs",
+        "$Backend\Models\Customer.cs",
+        "$Backend\Models\Shipment.cs",
+        "$Backend\Models\Vehicle.cs",
+        "$Backend\Models\Driver.cs",
+        "$Backend\Models\ShipmentAssignment.cs",
+        "$Backend\Migrations\20261123172349_InitialDatabaseSchema.cs",
+        "$Backend\Migrations\20261123172349_InitialDatabaseSchema.Designer.cs",
+        "$Backend\Migrations\QubriqDbContextModelSnapshot.cs",
+        "$Root\docs\development\VERSIONS.txt",
+        "$Root\docs\README.md",
+        "$Root\docs\modules\STAGE-1-DATABASE-FOUNDATION.md"
     )
 
-    Add-Result "Frontend production build" $BuildPassed "Vite build exit code: $ExitCode"
-}
-catch {
-    Add-Result "Frontend production build" $false $_.Exception.Message
-}
-finally {
-    Pop-Location
-}
+    $Missing = @($Required | Where-Object { -not (Test-Path $_) })
 
-# TEST 3 - Backend build
+    Add-Result `
+        "Project structure" `
+        ($Missing.Count -eq 0) `
+        $(if ($Missing.Count -eq 0) { "Required project, model, migration and documentation files exist." } else { "Missing: " + ($Missing -join "; ") })
 
-Push-Location $Backend
+    # TEST 2 - Frontend production build
 
-try {
-    $Output = dotnet build --configuration Debug 2>&1
-    $ExitCode = $LASTEXITCODE
+    Push-Location $Frontend
 
-    $Output | Out-File "$Logs\backend_build.log"
-
-    Add-Result "Backend build" ($ExitCode -eq 0) "dotnet build exit code: $ExitCode"
-}
-catch {
-    Add-Result "Backend build" $false $_.Exception.Message
-}
-finally {
-    Pop-Location
-}
-
-# TEST 4 - API startup
-
-$ApiReady = $false
-$ApiPort = ([uri]$ApiUrl).Port
-
-$ExistingConnection = Get-NetTCPConnection `
-    -LocalPort $ApiPort `
-    -State Listen `
-    -ErrorAction SilentlyContinue
-
-if ($ExistingConnection) {
-    Add-Result "API startup" $false "Port $ApiPort is already occupied. Stop the existing process and retry."
-}
-else {
     try {
-        $ApiProcess = Start-Process `
-            -FilePath "dotnet" `
-            -ArgumentList "run --no-build --urls $ApiUrl" `
-            -WorkingDirectory $Backend `
-            -PassThru `
-            -WindowStyle Hidden `
-            -RedirectStandardOutput "$Logs\api_stdout.log" `
-            -RedirectStandardError "$Logs\api_stderr.log"
+        $Output = npm run build 2>&1
+        $ExitCode = $LASTEXITCODE
+        $Output | Out-File "$Logs\frontend_build.log"
 
-        $Deadline = (Get-Date).AddSeconds(40)
+        $BuildPassed = (
+            $ExitCode -eq 0 -and
+            (Test-Path "$Frontend\dist\index.html")
+        )
 
-        while ((Get-Date) -lt $Deadline) {
+        Add-Result "Frontend production build" $BuildPassed "Vite build exit code: $ExitCode"
+    }
+    catch {
+        Add-Result "Frontend production build" $false $_.Exception.Message
+    }
+    finally {
+        Pop-Location
+    }
 
-            if ($ApiProcess.HasExited) {
-                break
-            }
+    # TEST 3 - Backend build
 
-            try {
-                $Response = Invoke-RestMethod `
-                    -Uri "$ApiUrl/api/health" `
-                    -TimeoutSec 2
+    Push-Location $Backend
 
-                if ($Response.status -eq "Healthy") {
-                    $ApiReady = $true
+    try {
+        $Output = dotnet build --configuration Debug 2>&1
+        $ExitCode = $LASTEXITCODE
+        $Output | Out-File "$Logs\backend_build.log"
+
+        Add-Result "Backend build" ($ExitCode -eq 0) "dotnet build exit code: $ExitCode"
+    }
+    catch {
+        Add-Result "Backend build" $false $_.Exception.Message
+    }
+    finally {
+        Pop-Location
+    }
+
+    # TEST 4 - API startup
+
+    $ApiReady = $false
+    $ApiPort = ([uri]$ApiUrl).Port
+
+    $ExistingConnection = Get-NetTCPConnection `
+        -LocalPort $ApiPort `
+        -State Listen `
+        -ErrorAction SilentlyContinue
+
+    if ($ExistingConnection) {
+        Add-Result "API startup" $false "Port $ApiPort is already occupied. Stop the existing API and retry."
+    }
+    else {
+        try {
+            $ApiProcess = Start-Process `
+                -FilePath "dotnet" `
+                -ArgumentList "run --no-build --urls `"$ApiUrl`"" `
+                -WorkingDirectory $Backend `
+                -PassThru `
+                -WindowStyle Hidden `
+                -RedirectStandardOutput "$Logs\api_stdout.log" `
+                -RedirectStandardError "$Logs\api_stderr.log"
+
+            $Deadline = (Get-Date).AddSeconds(45)
+
+            while ((Get-Date) -lt $Deadline) {
+
+                if ($ApiProcess.HasExited) {
                     break
                 }
+
+                try {
+                    $Health = Invoke-RestMethod `
+                        -Uri "$ApiUrl/api/health" `
+                        -TimeoutSec 3
+
+                    if ($Health.status -eq "Healthy") {
+                        $ApiReady = $true
+                        break
+                    }
+                }
+                catch {
+                    Start-Sleep -Seconds 1
+                }
             }
-            catch {
-                Start-Sleep -Seconds 1
-            }
+
+            Add-Result "API startup" $ApiReady "API startup verification."
         }
-
-        Add-Result "API startup" $ApiReady "API startup verification."
+        catch {
+            Add-Result "API startup" $false $_.Exception.Message
+        }
     }
-    catch {
-        Add-Result "API startup" $false $_.Exception.Message
+
+    # TEST 5 - API health endpoint
+
+    if ($ApiReady) {
+        try {
+            $Health = Invoke-RestMethod "$ApiUrl/api/health"
+
+            $Valid = (
+                $Health.status -eq "Healthy" -and
+                $Health.application -eq "Qubriq API" -and
+                $Health.stage -eq 1
+            )
+
+            Add-Result "API health endpoint" $Valid "Health response and Stage 1 validated."
+        }
+        catch {
+            Add-Result "API health endpoint" $false $_.Exception.Message
+        }
+    }
+    else {
+        Add-Result "API health endpoint" $false "Skipped: API unavailable."
+    }
+
+    # TEST 6 - Root endpoint
+
+    if ($ApiReady) {
+        try {
+            $RootResponse = Invoke-RestMethod "$ApiUrl/"
+
+            $Valid = (
+                $RootResponse.application -eq "Qubriq API" -and
+                $RootResponse.status -eq "Running" -and
+                $RootResponse.stage -eq 1
+            )
+
+            Add-Result "API root endpoint" $Valid "Root response and Stage 1 validated."
+        }
+        catch {
+            Add-Result "API root endpoint" $false $_.Exception.Message
+        }
+    }
+    else {
+        Add-Result "API root endpoint" $false "Skipped: API unavailable."
+    }
+
+    # TEST 7 - OpenAPI
+
+    if ($ApiReady) {
+        try {
+            $OpenApi = Invoke-RestMethod "$ApiUrl/openapi/v1.json"
+
+            $Valid = $null -ne $OpenApi.openapi
+
+            Add-Result "OpenAPI endpoint" $Valid "OpenAPI document verified."
+        }
+        catch {
+            Add-Result "OpenAPI endpoint" $false $_.Exception.Message
+        }
+    }
+    else {
+        Add-Result "OpenAPI endpoint" $false "Skipped: API unavailable."
+    }
+
+    # TEST 8 - Database connectivity
+
+    if ($ApiReady) {
+        try {
+            $Database = Invoke-RestMethod "$ApiUrl/api/database/health"
+
+            $Valid = (
+                $Database.database -eq "MySQL" -and
+                $Database.status -eq "Connected" -and
+                $Database.databaseName -eq "qubriq_dev"
+            )
+
+            Add-Result "MySQL database connectivity" $Valid "Database health endpoint validated."
+        }
+        catch {
+            Add-Result "MySQL database connectivity" $false $_.Exception.Message
+        }
+    }
+    else {
+        Add-Result "MySQL database connectivity" $false "Skipped: API unavailable."
     }
 }
+finally {
 
-# TEST 5 - Health endpoint
+    # CLEANUP
 
-if ($ApiReady) {
-    try {
-        $Health = Invoke-RestMethod "$ApiUrl/api/health"
-
-        $Valid = (
-            $Health.status -eq "Healthy" -and
-            $Health.application -eq "Qubriq API" -and
-            $Health.stage -eq 0
-        )
-
-        Add-Result "API health endpoint" $Valid "Health response validated."
+    if ($null -ne $ApiProcess) {
+        if (-not $ApiProcess.HasExited) {
+            Stop-Process -Id $ApiProcess.Id -Force -ErrorAction SilentlyContinue
+        }
     }
-    catch {
-        Add-Result "API health endpoint" $false $_.Exception.Message
-    }
-}
-else {
-    Add-Result "API health endpoint" $false "Skipped: API unavailable."
-}
 
-# TEST 6 - Root endpoint
-
-if ($ApiReady) {
-    try {
-        $RootResponse = Invoke-RestMethod "$ApiUrl/"
-
-        $Valid = (
-            $RootResponse.application -eq "Qubriq API" -and
-            $RootResponse.status -eq "Running"
-        )
-
-        Add-Result "API root endpoint" $Valid "Root response validated."
-    }
-    catch {
-        Add-Result "API root endpoint" $false $_.Exception.Message
-    }
-}
-else {
-    Add-Result "API root endpoint" $false "Skipped: API unavailable."
-}
-
-# TEST 7 - OpenAPI
-
-if ($ApiReady) {
-    try {
-        $OpenApi = Invoke-RestMethod "$ApiUrl/openapi/v1.json"
-
-        $Valid = $null -ne $OpenApi.openapi
-
-        Add-Result "OpenAPI endpoint" $Valid "OpenAPI document verified."
-    }
-    catch {
-        Add-Result "OpenAPI endpoint" $false $_.Exception.Message
-    }
-}
-else {
-    Add-Result "OpenAPI endpoint" $false "Skipped: API unavailable."
-}
-
-# CLEANUP
-
-if ($null -ne $ApiProcess) {
-    if (-not $ApiProcess.HasExited) {
-        Stop-Process -Id $ApiProcess.Id -Force -ErrorAction SilentlyContinue
-    }
+    $env:ASPNETCORE_ENVIRONMENT = $PreviousEnvironment
 }
 
 # REPORT
@@ -246,7 +288,7 @@ $Failed = @($Results | Where-Object { $_.Result -eq "FAIL" }).Count
 
 $Report = [PSCustomObject]@{
     Project = "Qubriq"
-    Stage = 0
+    Stage = 1
     Date = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     TotalTests = $Results.Count
     Passed = $Passed
@@ -259,9 +301,9 @@ $Report | ConvertTo-Json -Depth 5 |
 
 $Results | Export-Csv "$Logs\latest-test-report.csv" -NoTypeInformation
 
-Write-Host "`n==================================" -ForegroundColor Cyan
-Write-Host "          TEST SUMMARY" -ForegroundColor Cyan
-Write-Host "==================================" -ForegroundColor Cyan
+Write-Host "`n========================================" -ForegroundColor Cyan
+Write-Host "             TEST SUMMARY" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
 
 Write-Host "Total  : $($Results.Count)"
 Write-Host "Passed : $Passed" -ForegroundColor Green
@@ -270,9 +312,9 @@ Write-Host "Failed : $Failed" -ForegroundColor Red
 Write-Host "`nReports: $Logs" -ForegroundColor Yellow
 
 if ($Failed -gt 0) {
-    Write-Host "`nSTAGE 0 FAILED" -ForegroundColor Red
+    Write-Host "`nSTAGE 1 FAILED" -ForegroundColor Red
     exit 1
 }
 
-Write-Host "`nSTAGE 0 PASSED" -ForegroundColor Green
+Write-Host "`nSTAGE 1 PASSED" -ForegroundColor Green
 exit 0
