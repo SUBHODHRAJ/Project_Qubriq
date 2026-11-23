@@ -1,0 +1,90 @@
+﻿* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, Helvetica, sans-serif;
+    background: #f1f4f9;
+    color: #17243a;
+}
+
+.app {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.panel {
+    width: 100%;
+    max-width: 620px;
+    background: #ffffff;
+    padding: 42px;
+    border-radius: 14px;
+    box-shadow: 0 10px 35px rgba(15, 35, 65, 0.08);
+}
+
+.brand {
+    color: #2563eb;
+    font-weight: 800;
+    font-size: 27px;
+    letter-spacing: 2px;
+}
+
+.subtitle {
+    color: #64748b;
+    font-size: 13px;
+}
+
+h1 {
+    margin-top: 38px;
+    font-size: 29px;
+}
+
+.description {
+    color: #64748b;
+}
+
+.status-card {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px;
+    margin-top: 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 9px;
+}
+
+.success {
+    color: #15803d;
+}
+
+.warning {
+    color: #b45309;
+}
+
+.api-result {
+    overflow: auto;
+    padding: 14px;
+    background: #f1f5f9;
+    border-radius: 8px;
+    font-size: 12px;
+}
+
+.footer {
+    margin-top: 35px;
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+@media (max-width: 550px) {
+    .panel {
+        padding: 24px;
+    }
+
+    .status-card {
+        flex-direction: column;
+    }
+}

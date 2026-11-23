@@ -1,0 +1,30 @@
+﻿# Node
+node_modules/
+dist/
+npm-debug.log*
+
+# .NET
+bin/
+obj/
+.vs/
+*.user
+*.suo
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+appsettings.Development.json
+secrets.json
+
+# Logs
+*.log
+tests/logs/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

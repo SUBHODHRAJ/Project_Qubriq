@@ -1,0 +1,18 @@
+﻿QUBRIQ - LOCKED INITIAL PACKAGE VERSIONS
+
+React: 19.3.1
+React DOM: 19.3.1
+Vite: 8.3.8
+Three.js: 0.187.0
+Vite React Plugin: 6.3.0
+
+Target Framework: .NET 10
+Microsoft.AspNetCore.OpenApi: 10.0.15
+EF Core Design: 10.0.12
+EF Core Tools: 10.0.12
+MySql.EntityFrameworkCore: 10.0.12
+MySql.Data: 26.10.0
+dotnet-ef: 10.0.12
+
+Frontend package-lock.json and backend project.assets.json
+are used to preserve the restored dependency versions.
