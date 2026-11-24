@@ -23,9 +23,9 @@ Database:
 ## Development URLs
 
 Frontend: http://127.0.0.1:5173
-Backend:  http://127.0.0.1:5080
-Health:   http://127.0.0.1:5080/api/health
-OpenAPI:  http://127.0.0.1:5080/openapi/v1.json
+Backend:  http://127.0.0.1:5066
+Health:   http://127.0.0.1:5066/api/health
+OpenAPI:  http://127.0.0.1:5066/openapi/v1.json
 
 ## Start Frontend
 
@@ -35,7 +35,7 @@ npm run dev
 ## Start Backend
 
 cd backend/Qubriq.API
-dotnet run --urls http://127.0.0.1:5080
+dotnet run --urls http://127.0.0.1:5066
 
 ## Run Automated Tests
 
