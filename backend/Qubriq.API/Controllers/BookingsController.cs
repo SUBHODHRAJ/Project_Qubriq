@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Qubriq.API.Data;
 using Qubriq.API.DTOs;
@@ -7,6 +9,7 @@ using Qubriq.API.Models;
 namespace Qubriq.API.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/bookings")]
 public class BookingsController : ControllerBase
 {
@@ -17,17 +20,66 @@ public class BookingsController : ControllerBase
         _db = db;
     }
 
+    private long? GetAuthenticatedUserId()
+    {
+        var subject =
+            User.FindFirst("sub")?.Value ??
+            User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (long.TryParse(subject, out var userId))
+        {
+            return userId;
+        }
+
+        return null;
+    }
+
+    private async Task<bool> HasPermissionAsync(
+        long userId,
+        string permissionCode)
+    {
+        return await _db.UserRoles
+            .Where(userRole => userRole.UserId == userId)
+            .Join(
+                _db.RolePermissions,
+                userRole => userRole.RoleId,
+                rolePermission => rolePermission.RoleId,
+                (userRole, rolePermission) => rolePermission)
+            .AnyAsync(rolePermission =>
+                rolePermission.IsAllowed &&
+                rolePermission.Permission.Code == permissionCode);
+    }
+
     // GET: api/bookings
-    // Optional filters: status, search
+    // Internal users see all permitted bookings.
+    // Booking customers see only their own bookings.
     [HttpGet]
+    [Authorize(Policy = "BookingsRead")]
     public async Task<IActionResult> GetBookings(
         [FromQuery] string? status,
         [FromQuery] string? search)
     {
+        var userId = GetAuthenticatedUserId();
+
+        if (!userId.HasValue)
+        {
+            return Unauthorized();
+        }
+
+        var canReadAll = await HasPermissionAsync(
+            userId.Value,
+            "bookings.read_all");
+
         var query = _db.Shipments
             .AsNoTracking()
             .Include(x => x.Customer)
             .AsQueryable();
+
+        if (!canReadAll)
+        {
+            query = query.Where(x =>
+                x.Customer.UserId == userId.Value);
+        }
 
         if (!string.IsNullOrWhiteSpace(status) &&
             !status.Equals("All", StringComparison.OrdinalIgnoreCase))
@@ -69,7 +121,9 @@ public class BookingsController : ControllerBase
     }
 
     // GET: api/bookings/customers
+    // Only users with bookings.read_all can list customer records.
     [HttpGet("customers")]
+    [Authorize(Policy = "BookingsReadAll")]
     public async Task<IActionResult> GetCustomers()
     {
         var customers = await _db.Customers
@@ -92,18 +146,56 @@ public class BookingsController : ControllerBase
 
     // POST: api/bookings
     [HttpPost]
+    [Authorize(Policy = "BookingsCreate")]
     public async Task<IActionResult> CreateBooking(
         [FromBody] CreateBookingRequest request)
     {
-        var customer = await _db.Customers
-            .FirstOrDefaultAsync(x =>
-                x.Id == request.CustomerId && x.IsActive);
+        var userId = GetAuthenticatedUserId();
+
+        if (!userId.HasValue)
+        {
+            return Unauthorized();
+        }
+
+        var canReadAll = await HasPermissionAsync(
+            userId.Value,
+            "bookings.read_all");
+
+        Customer? customer = null;
+
+        if (canReadAll)
+        {
+            if (!request.CustomerId.HasValue ||
+                request.CustomerId.Value <= 0)
+            {
+                return BadRequest(new
+                {
+                    message = "A valid customer must be selected."
+                });
+            }
+
+            customer = await _db.Customers
+                .FirstOrDefaultAsync(x =>
+                    x.Id == request.CustomerId.Value &&
+                    x.IsActive);
+        }
+        else
+        {
+            // Never trust a customer ID submitted by an external customer.
+            // Resolve the customer's own profile from the authenticated user.
+            customer = await _db.Customers
+                .FirstOrDefaultAsync(x =>
+                    x.UserId == userId.Value &&
+                    x.IsActive);
+        }
 
         if (customer == null)
         {
             return BadRequest(new
             {
-                message = "Select an active customer before creating a booking."
+                message = canReadAll
+                    ? "Select an active customer before creating a booking."
+                    : "Your account does not have an active customer profile. Contact Qubriq support."
             });
         }
 
@@ -131,7 +223,7 @@ public class BookingsController : ControllerBase
         var shipment = new Shipment
         {
             TrackingNumber = trackingNumber,
-            CustomerId = request.CustomerId,
+            CustomerId = customer.Id,
             Origin = request.Origin.Trim(),
             Destination = request.Destination.Trim(),
             Status = request.Status,

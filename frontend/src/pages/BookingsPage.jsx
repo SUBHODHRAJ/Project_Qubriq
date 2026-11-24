@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { bookingService } from "../services/bookingService";
+import { useAuth } from "../context/AuthContext";
 import "../styles/bookings.css";
 import "../styles/dashboard.css";
 
@@ -26,11 +27,11 @@ const emptyForm = {
 };
 
 function formatDate(value) {
-    if (!value) return "—";
+    if (!value) return "â€”";
 
     const date = new Date(value);
 
-    if (Number.isNaN(date.getTime())) return "—";
+    if (Number.isNaN(date.getTime())) return "â€”";
 
     return date.toLocaleDateString();
 }
@@ -47,6 +48,14 @@ function statusClass(status) {
 function BookingsPage() {
     const location = useLocation();
     const navigate = useNavigate();
+    const { hasRole } = useAuth();
+
+    const isBookingCustomer = hasRole("BookingCustomer");
+    const canSelectCustomer =
+        hasRole("Admin") || hasRole("OperationsDispatcher");
+    const bookingBasePath = isBookingCustomer
+        ? "/customer/bookings"
+        : "/app/bookings";
 
     const [bookings, setBookings] = useState([]);
     const [customers, setCustomers] = useState([]);
@@ -100,7 +109,12 @@ function BookingsPage() {
     }, [search, status, reloadToken]);
 
     useEffect(() => {
-        if (!showForm) return;
+        if (!showForm || !canSelectCustomer) {
+            setCustomers([]);
+            setCustomerError("");
+            setCustomersLoading(false);
+            return;
+        }
 
         let cancelled = false;
 
@@ -131,13 +145,12 @@ function BookingsPage() {
         return () => {
             cancelled = true;
         };
-    }, [showForm]);
-
+    }, [showForm, canSelectCustomer]);
     function openCreateForm() {
         setForm(emptyForm);
         setFormError("");
         setSuccess("");
-        navigate("/app/bookings/new");
+        navigate(`${bookingBasePath}/new`);
     }
 
     function closeCreateForm() {
@@ -146,7 +159,7 @@ function BookingsPage() {
         setShowForm(false);
         setForm(emptyForm);
         setFormError("");
-        navigate("/app/bookings");
+        navigate(bookingBasePath);
     }
 
     function handleInputChange(event) {
@@ -163,7 +176,7 @@ function BookingsPage() {
         setFormError("");
         setSuccess("");
 
-        if (!form.customerId) {
+        if (canSelectCustomer && !form.customerId) {
             setFormError("Please select an active customer.");
             return;
         }
@@ -194,7 +207,9 @@ function BookingsPage() {
         };
 
         const payload = {
-            customerId: Number(form.customerId),
+            ...(canSelectCustomer
+                ? { customerId: Number(form.customerId) }
+                : {}),
             origin: form.origin.trim(),
             destination: form.destination.trim(),
             cargoName: form.cargoName.trim(),
@@ -244,7 +259,7 @@ function BookingsPage() {
 
             setForm(emptyForm);
             setShowForm(false);
-            navigate("/app/bookings");
+            navigate(bookingBasePath);
             setReloadToken((value) => value + 1);
         } catch (err) {
             setFormError(
@@ -317,7 +332,7 @@ function BookingsPage() {
 
                 {!loading && !error && bookings.length === 0 && (
                     <div className="dashboard-empty booking-empty">
-                        <div className="empty-symbol" aria-hidden="true">▤</div>
+                        <div className="empty-symbol" aria-hidden="true">â–¤</div>
                         <strong>No bookings found</strong>
                         <span>
                             Create a booking to see shipment requests here.
@@ -351,28 +366,28 @@ function BookingsPage() {
                                 {bookings.map((booking) => (
                                     <tr key={booking.id}>
                                         <td className="booking-reference">
-                                            {booking.bookingId || "—"}
+                                            {booking.bookingId || "â€”"}
                                         </td>
-                                        <td>{booking.customer || "—"}</td>
+                                        <td>{booking.customer || "â€”"}</td>
                                         <td>
                                             <div className="booking-route">
-                                                <span>{booking.pickupLocation || "—"}</span>
-                                                <span aria-hidden="true">↓</span>
-                                                <span>{booking.deliveryLocation || "—"}</span>
+                                                <span>{booking.pickupLocation || "â€”"}</span>
+                                                <span aria-hidden="true">â†“</span>
+                                                <span>{booking.deliveryLocation || "â€”"}</span>
                                             </div>
                                         </td>
                                         <td>
                                             {booking.cargoName ||
                                                 booking.cargoType ||
-                                                "—"}
+                                                "â€”"}
                                         </td>
                                         <td>
                                             {booking.weight != null
                                                 ? `${booking.weight} kg`
-                                                : "—"}
+                                                : "â€”"}
                                         </td>
                                         <td>{formatDate(booking.pickupDate)}</td>
-                                        <td>{booking.priority || "—"}</td>
+                                        <td>{booking.priority || "â€”"}</td>
                                         <td>
                                             <span className={statusClass(booking.status)}>
                                                 {booking.status || "Unknown"}
@@ -415,7 +430,7 @@ function BookingsPage() {
                                 disabled={saving}
                                 aria-label="Close booking form"
                             >
-                                ×
+                                Ã—
                             </button>
                         </div>
 
@@ -425,30 +440,32 @@ function BookingsPage() {
                                     <h3>Customer and route</h3>
 
                                     <div className="booking-form-grid">
-                                        <label className="booking-field booking-field-full">
-                                            Customer <span>*</span>
-                                            <select
-                                                name="customerId"
-                                                value={form.customerId}
-                                                onChange={handleInputChange}
-                                                required
-                                                disabled={customersLoading}
-                                            >
-                                                <option value="">
-                                                    {customersLoading
-                                                        ? "Loading customers..."
-                                                        : "Select an active customer"}
-                                                </option>
-                                                {customers.map((customer) => (
-                                                    <option
-                                                        key={customer.id}
-                                                        value={customer.id}
-                                                    >
-                                                        {customer.companyName}
+                                        {canSelectCustomer && (
+                                            <label className="booking-field booking-field-full">
+                                                Customer <span>*</span>
+                                                <select
+                                                    name="customerId"
+                                                    value={form.customerId}
+                                                    onChange={handleInputChange}
+                                                    required
+                                                    disabled={customersLoading}
+                                                >
+                                                    <option value="">
+                                                        {customersLoading
+                                                            ? "Loading customers..."
+                                                            : "Select an active customer"}
                                                     </option>
-                                                ))}
-                                            </select>
-                                        </label>
+                                                    {customers.map((customer) => (
+                                                        <option
+                                                            key={customer.id}
+                                                            value={customer.id}
+                                                        >
+                                                            {customer.companyName}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </label>
+                                        )}
 
                                         <label className="booking-field">
                                             Pickup location <span>*</span>
@@ -532,7 +549,7 @@ function BookingsPage() {
                                     </div>
 
                                     <div className="booking-subsection-label">
-                                        Dimensions (cm) – optional
+                                        Dimensions (cm) â€“ optional
                                     </div>
 
                                     <div className="booking-form-grid booking-dimensions-grid">
@@ -580,7 +597,7 @@ function BookingsPage() {
                                             checked={form.isFragile}
                                             onChange={handleInputChange}
                                         />
-                                        Fragile cargo – special care required
+                                        Fragile cargo â€“ special care required
                                     </label>
 
                                     <label className="booking-field booking-field-full">
@@ -628,7 +645,7 @@ function BookingsPage() {
                                                 value={form.deliveryTimeWindow}
                                                 onChange={handleInputChange}
                                                 maxLength={100}
-                                                placeholder="e.g. 9 AM – 12 PM"
+                                                placeholder="e.g. 9 AM â€“ 12 PM"
                                             />
                                         </label>
 
@@ -674,13 +691,13 @@ function BookingsPage() {
                                     </label>
                                 </div>
 
-                                {customerError && (
+                                {canSelectCustomer && customerError && (
                                     <div className="booking-error" role="alert">
                                         {customerError}
                                     </div>
                                 )}
 
-                                {customers.length === 0 &&
+                                {canSelectCustomer && customers.length === 0 &&
                                     !customersLoading &&
                                     !customerError && (
                                         <div className="booking-error" role="alert">
@@ -711,9 +728,10 @@ function BookingsPage() {
                                     className="button-primary"
                                     disabled={
                                         saving ||
-                                        customersLoading ||
-                                        customers.length === 0 ||
-                                        Boolean(customerError)
+                                        (canSelectCustomer &&
+                                            (customersLoading ||
+                                             customers.length === 0 ||
+                                             Boolean(customerError)))
                                     }
                                 >
                                     {saving ? "Creating..." : "Create Booking"}

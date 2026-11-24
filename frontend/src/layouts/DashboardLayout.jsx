@@ -1,4 +1,5 @@
-﻿import { NavLink, Outlet } from "react-router-dom";
+﻿import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import "../styles/dashboard.css";
 
 const navigation = [
@@ -15,7 +16,8 @@ const navigation = [
     {
         label: "Customers",
         path: "/app/customers",
-        icon: "♙"
+        icon: "♙",
+        adminOnly: true
     },
     {
         label: "Fleet & Planning",
@@ -60,7 +62,8 @@ const navigation = [
     {
         label: "Finance",
         path: "/app/finance",
-        icon: "₹"
+        icon: "₹",
+        adminOnly: true
     },
     {
         label: "Analytics",
@@ -70,11 +73,29 @@ const navigation = [
     {
         label: "Settings",
         path: "/app/settings",
-        icon: "⚙"
+        icon: "⚙",
+        adminOnly: true
     }
 ];
 
 function DashboardLayout() {
+    const { user, roles, hasRole, logout } = useAuth();
+    const navigate = useNavigate();
+
+    const isAdmin = hasRole("Admin");
+
+    const visibleNavigation = navigation.filter(
+        (item) => !item.adminOnly || isAdmin
+    );
+
+    const roleLabel = roles.join(", ") || "User";
+    const displayName = user?.fullName || "User";
+
+    function handleLogout() {
+        logout();
+        navigate("/login", { replace: true });
+    }
+
     return (
         <div className="dashboard-shell">
             <aside className="dashboard-sidebar">
@@ -86,7 +107,7 @@ function DashboardLayout() {
                 </div>
 
                 <nav className="sidebar-navigation" aria-label="Main navigation">
-                    {navigation.map((item) => (
+                    {visibleNavigation.map((item) => (
                         <NavLink
                             key={item.path}
                             to={item.path}
@@ -129,9 +150,24 @@ function DashboardLayout() {
                             <span aria-hidden="true">⌄</span>
                         </button>
 
-                        <div className="profile-placeholder" aria-hidden="true">
-                            <span className="profile-avatar">U</span>
-                            <span className="profile-label">User profile</span>
+                        <div className="profile-placeholder">
+                            <span className="profile-avatar">
+                                {displayName.charAt(0).toUpperCase()}
+                            </span>
+
+                            <span className="profile-label">
+                                <strong>{displayName}</strong>
+                                <small>{roleLabel}</small>
+                            </span>
+
+                            <button
+                                type="button"
+                                onClick={handleLogout}
+                                aria-label="Sign out"
+                                title="Sign out"
+                            >
+                                Sign out
+                            </button>
                         </div>
                     </div>
                 </header>

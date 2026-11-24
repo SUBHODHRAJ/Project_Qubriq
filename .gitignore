@@ -39,3 +39,20 @@ backend/_Backups/
 *.before-*
 *.stage2-backup
 *.pre-stage2-update.ps1
+# Qubriq local development artifacts
+Batch_G*.ps1
+backend/Qubriq.API/Batch7_*.ps1
+frontend/src/routes/*.stage2-booking-backup
+qubriq_dev_backup_*.sql
+
+# Root-level local backups
+_Backups/
+
+# Stage-specific local backups
+*.stage*-backup
+
+# Stage backup files with extensions
+*.stage*-backup*
+
+# Manual migration review script; EF migration is canonical
+backend/Qubriq.API/Migrations/RBAC_Migration_Review.sql
