@@ -19,6 +19,46 @@ namespace Qubriq.API.Migrations
                 .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
 
+            modelBuilder.Entity("Qubriq.API.Models.AuditLog", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Details")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("EntityId")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<long?>("UserId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAtUtc");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("EntityType", "EntityId");
+
+                    b.ToTable("AuditLogs", (string)null);
+                });
+
             modelBuilder.Entity("Qubriq.API.Models.Customer", b =>
                 {
                     b.Property<long>("Id")
@@ -52,9 +92,52 @@ namespace Qubriq.API.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("varchar(30)");
 
+                    b.Property<long?>("UserId")
+                        .HasColumnType("bigint");
+
                     b.HasKey("Id");
 
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
                     b.ToTable("Customers", (string)null);
+                });
+
+            modelBuilder.Entity("Qubriq.API.Models.DeliveryProof", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("FileReference")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<string>("ProofType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<string>("Remarks")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<long>("ShipmentId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("SubmittedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<long>("SubmittedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ShipmentId");
+
+                    b.HasIndex("SubmittedByUserId");
+
+                    b.ToTable("DeliveryProofs", (string)null);
                 });
 
             modelBuilder.Entity("Qubriq.API.Models.Driver", b =>
@@ -82,12 +165,83 @@ namespace Qubriq.API.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("varchar(40)");
 
+                    b.Property<long?>("UserId")
+                        .HasColumnType("bigint");
+
                     b.HasKey("Id");
 
                     b.HasIndex("LicenseNumber")
                         .IsUnique();
 
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
                     b.ToTable("Drivers", (string)null);
+                });
+
+            modelBuilder.Entity("Qubriq.API.Models.ExternalLogin", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<string>("ProviderSubject")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("Provider", "ProviderSubject")
+                        .IsUnique();
+
+                    b.ToTable("ExternalLogins", (string)null);
+                });
+
+            modelBuilder.Entity("Qubriq.API.Models.Permission", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(300)
+                        .HasColumnType("varchar(300)");
+
+                    b.Property<string>("Module")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("Permissions", (string)null);
                 });
 
             modelBuilder.Entity("Qubriq.API.Models.Role", b =>
@@ -111,6 +265,27 @@ namespace Qubriq.API.Migrations
                         .IsUnique();
 
                     b.ToTable("Roles", (string)null);
+                });
+
+            modelBuilder.Entity("Qubriq.API.Models.RolePermission", b =>
+                {
+                    b.Property<long>("RoleId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("PermissionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("AssignedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("IsAllowed")
+                        .HasColumnType("tinyint(1)");
+
+                    b.HasKey("RoleId", "PermissionId");
+
+                    b.HasIndex("PermissionId");
+
+                    b.ToTable("RolePermissions", (string)null);
                 });
 
             modelBuilder.Entity("Qubriq.API.Models.Shipment", b =>
@@ -244,6 +419,31 @@ namespace Qubriq.API.Migrations
                     b.ToTable("ShipmentAssignments", (string)null);
                 });
 
+            modelBuilder.Entity("Qubriq.API.Models.ShipmentRecipient", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<long>("ShipmentId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("ShipmentId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("ShipmentRecipients", (string)null);
+                });
+
             modelBuilder.Entity("Qubriq.API.Models.User", b =>
                 {
                     b.Property<long>("Id")
@@ -258,6 +458,9 @@ namespace Qubriq.API.Migrations
                         .HasMaxLength(254)
                         .HasColumnType("varchar(254)");
 
+                    b.Property<bool>("EmailVerified")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(150)
@@ -266,10 +469,16 @@ namespace Qubriq.API.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("tinyint(1)");
 
+                    b.Property<DateTime?>("LastLoginAtUtc")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<string>("PasswordHash")
-                        .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("varchar(500)");
+
+                    b.Property<string>("RecipientType")
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
 
                     b.Property<DateTime?>("UpdatedAtUtc")
                         .HasColumnType("datetime(6)");
@@ -332,6 +541,85 @@ namespace Qubriq.API.Migrations
                     b.ToTable("Vehicles", (string)null);
                 });
 
+            modelBuilder.Entity("Qubriq.API.Models.AuditLog", b =>
+                {
+                    b.HasOne("Qubriq.API.Models.User", "User")
+                        .WithMany("AuditLogs")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Qubriq.API.Models.Customer", b =>
+                {
+                    b.HasOne("Qubriq.API.Models.User", "User")
+                        .WithOne("Customer")
+                        .HasForeignKey("Qubriq.API.Models.Customer", "UserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Qubriq.API.Models.DeliveryProof", b =>
+                {
+                    b.HasOne("Qubriq.API.Models.Shipment", "Shipment")
+                        .WithMany()
+                        .HasForeignKey("ShipmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Qubriq.API.Models.User", "SubmittedByUser")
+                        .WithMany("DeliveryProofs")
+                        .HasForeignKey("SubmittedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Shipment");
+
+                    b.Navigation("SubmittedByUser");
+                });
+
+            modelBuilder.Entity("Qubriq.API.Models.Driver", b =>
+                {
+                    b.HasOne("Qubriq.API.Models.User", "User")
+                        .WithOne("Driver")
+                        .HasForeignKey("Qubriq.API.Models.Driver", "UserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Qubriq.API.Models.ExternalLogin", b =>
+                {
+                    b.HasOne("Qubriq.API.Models.User", "User")
+                        .WithMany("ExternalLogins")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Qubriq.API.Models.RolePermission", b =>
+                {
+                    b.HasOne("Qubriq.API.Models.Permission", "Permission")
+                        .WithMany("RolePermissions")
+                        .HasForeignKey("PermissionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Qubriq.API.Models.Role", "Role")
+                        .WithMany("RolePermissions")
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Permission");
+
+                    b.Navigation("Role");
+                });
+
             modelBuilder.Entity("Qubriq.API.Models.Shipment", b =>
                 {
                     b.HasOne("Qubriq.API.Models.Customer", "Customer")
@@ -370,6 +658,25 @@ namespace Qubriq.API.Migrations
                     b.Navigation("Vehicle");
                 });
 
+            modelBuilder.Entity("Qubriq.API.Models.ShipmentRecipient", b =>
+                {
+                    b.HasOne("Qubriq.API.Models.Shipment", "Shipment")
+                        .WithMany()
+                        .HasForeignKey("ShipmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Qubriq.API.Models.User", "User")
+                        .WithMany("ShipmentRecipients")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Shipment");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Qubriq.API.Models.UserRole", b =>
                 {
                     b.HasOne("Qubriq.API.Models.Role", "Role")
@@ -399,8 +706,15 @@ namespace Qubriq.API.Migrations
                     b.Navigation("Assignments");
                 });
 
+            modelBuilder.Entity("Qubriq.API.Models.Permission", b =>
+                {
+                    b.Navigation("RolePermissions");
+                });
+
             modelBuilder.Entity("Qubriq.API.Models.Role", b =>
                 {
+                    b.Navigation("RolePermissions");
+
                     b.Navigation("UserRoles");
                 });
 
@@ -411,6 +725,18 @@ namespace Qubriq.API.Migrations
 
             modelBuilder.Entity("Qubriq.API.Models.User", b =>
                 {
+                    b.Navigation("AuditLogs");
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("DeliveryProofs");
+
+                    b.Navigation("Driver");
+
+                    b.Navigation("ExternalLogins");
+
+                    b.Navigation("ShipmentRecipients");
+
                     b.Navigation("UserRoles");
                 });
 

@@ -1,127 +1,100 @@
-﻿import { Link } from "react-router-dom";
-
-const metricCards = [
-    "Active shipments",
-    "Vehicles available",
-    "Open compliance alerts",
-    "Delivery risk items"
-];
-
-function EmptyPanel({ children, className = "" }) {
-    return (
-        <div className={`dashboard-empty ${className}`}>
-            {children}
-        </div>
-    );
-}
+﻿import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { dispatcherService } from "../services/dispatcherService";
+import "../styles/dashboard.css";
+import "../styles/dispatcher.css";
 
 function CommandCenterPage() {
+    const [data, setData] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        let active = true;
+
+        async function load() {
+            try {
+                const result = await dispatcherService.getDashboard();
+                if (active) setData(result);
+            } catch (err) {
+                if (active) setError(err.message || "Dashboard could not be loaded.");
+            } finally {
+                if (active) setLoading(false);
+            }
+        }
+
+        load();
+        return () => { active = false; };
+    }, []);
+
+    const metrics = [
+        ["Total bookings", data?.bookings?.total ?? 0],
+        ["Pending bookings", data?.bookings?.pending ?? 0],
+        ["Confirmed bookings", data?.bookings?.confirmed ?? 0],
+        ["Active shipments", data?.shipments?.active ?? 0],
+        ["Delivered shipments", data?.shipments?.delivered ?? 0],
+        ["Available vehicles", data?.fleet?.availableVehicles ?? 0],
+        ["Available drivers", data?.fleet?.availableDrivers ?? 0],
+        ["Active assignments", data?.fleet?.activeAssignments ?? 0]
+    ];
+
     return (
-        <div className="command-center">
+        <section className="module-page dispatcher-page">
             <div className="page-heading-row">
                 <div>
                     <h1>Command Center</h1>
-                    <p>
-                        Centralized operational overview of the logistics operation.
-                    </p>
+                    <p>Live operational overview of Qubriq logistics.</p>
                 </div>
-
                 <div className="page-actions">
-                    <button type="button" className="button-secondary" disabled>
-                        Export
-                    </button>
-                    <Link to="/app/bookings/new" className="button-primary">
-                        Create booking
+                    <Link to="/app/bookings" className="button-secondary">
+                        Manage bookings
+                    </Link>
+                    <Link to="/app/shipments" className="button-primary">
+                        Manage shipments
                     </Link>
                 </div>
             </div>
 
-            <section className="metric-grid" aria-label="Operational summary">
-                {metricCards.map((label) => (
-                    <article className="dashboard-card metric-card" key={label}>
-                        <h2>{label}</h2>
-                        <div className="metric-value">—</div>
-                        <p>No data available</p>
-                    </article>
-                ))}
-            </section>
+            {loading && <div className="dashboard-card dispatcher-message">Loading dashboard metrics...</div>}
+            {error && <div className="dispatcher-error" role="alert">{error}</div>}
 
-            <section className="overview-grid">
-                <article className="dashboard-card shipment-overview-card">
-                    <h2>Active shipment overview</h2>
-                    <EmptyPanel>
-                        <div className="empty-symbol" aria-hidden="true">▤</div>
-                        <strong>No shipments available</strong>
-                        <span>
-                            Shipments will appear here once bookings are created.
-                        </span>
-                    </EmptyPanel>
-                </article>
-
-                <article className="dashboard-card fleet-overview-card">
-                    <h2>Fleet overview</h2>
-                    <EmptyPanel>
-                        No vehicles available
-                    </EmptyPanel>
-                </article>
-
-                <article className="dashboard-card capacity-card">
-                    <h2>Capacity utilization</h2>
-                    <EmptyPanel>
-                        No capacity data available
-                    </EmptyPanel>
-                </article>
-            </section>
-
-            <section className="overview-grid lower-overview-grid">
-                <article className="dashboard-card">
-                    <h2>Compliance alerts</h2>
-                    <EmptyPanel>No compliance alerts</EmptyPanel>
-                </article>
-
-                <article className="dashboard-card">
-                    <h2>Delivery risk</h2>
-                    <EmptyPanel>No delivery risk data available</EmptyPanel>
-                </article>
-
-                <article className="dashboard-card">
-                    <h2>Upcoming deliveries</h2>
-                    <EmptyPanel>No upcoming deliveries</EmptyPanel>
-                </article>
-            </section>
-
-            <section className="bottom-overview-grid">
-                <article className="dashboard-card live-map-card">
-                    <h2>Live logistics map</h2>
-                    <div className="map-placeholder">
-                        <span>Map integration</span>
+            {!loading && !error && (
+                <>
+                    <div className="dispatcher-metric-grid">
+                        {metrics.map(([label, value]) => (
+                            <article className="dashboard-card dispatcher-metric" key={label}>
+                                <span>{label}</span>
+                                <strong>{value}</strong>
+                            </article>
+                        ))}
                     </div>
-                </article>
 
-                <article className="dashboard-card activities-card">
-                    <h2>Recent operational activities</h2>
-                    <div className="activity-table-wrap">
-                        <table className="activity-table">
-                            <thead>
-                                <tr>
-                                    <th>Time</th>
-                                    <th>Activity</th>
-                                    <th>Reference</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td colSpan="4" className="table-empty">
-                                        No data available
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                    <div className="dispatcher-section-grid">
+                        <article className="dashboard-card dispatcher-panel">
+                            <h2>Booking overview</h2>
+                            <p>Pending: <strong>{data?.bookings?.pending ?? 0}</strong></p>
+                            <p>Confirmed: <strong>{data?.bookings?.confirmed ?? 0}</strong></p>
+                            <p>Rejected: <strong>{data?.bookings?.rejected ?? 0}</strong></p>
+                            <Link to="/app/bookings">Open booking management →</Link>
+                        </article>
+
+                        <article className="dashboard-card dispatcher-panel">
+                            <h2>Fleet availability</h2>
+                            <p>Vehicles available: <strong>{data?.fleet?.availableVehicles ?? 0}</strong></p>
+                            <p>Drivers available: <strong>{data?.fleet?.availableDrivers ?? 0}</strong></p>
+                            <p>Active assignments: <strong>{data?.fleet?.activeAssignments ?? 0}</strong></p>
+                            <Link to="/app/fleet">Open fleet planning →</Link>
+                        </article>
                     </div>
-                </article>
-            </section>
-        </div>
+
+                    <p className="dispatcher-updated">
+                        Last loaded: {data?.generatedAtUtc
+                            ? new Date(data.generatedAtUtc).toLocaleString()
+                            : "—"}
+                    </p>
+                </>
+            )}
+        </section>
     );
 }
 

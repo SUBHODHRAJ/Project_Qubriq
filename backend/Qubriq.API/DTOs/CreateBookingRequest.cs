@@ -1,11 +1,11 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace Qubriq.API.DTOs;
 
 public class CreateBookingRequest
 {
     [Range(1, long.MaxValue)]
-    public long CustomerId { get; set; }
+    public long? CustomerId { get; set; }
 
     [Required]
     [StringLength(250)]

@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Qubriq.API.Data;
 using Qubriq.API.DTOs;
@@ -7,6 +8,7 @@ using Qubriq.API.Models;
 namespace Qubriq.API.Controllers;
 
 [ApiController]
+[Authorize(Roles = "Admin")]
 [Route("api/customers")]
 public class CustomersController : ControllerBase
 {
