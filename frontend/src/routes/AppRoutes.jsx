@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+﻿import { Routes, Route, Navigate } from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext";
 import { getRoleHome } from "./roleHome";
@@ -16,12 +16,16 @@ import DashboardLayout from "../layouts/DashboardLayout";
 import CommandCenterPage from "../pages/CommandCenterPage";
 import CustomersPage from "../pages/CustomersPage";
 import BookingsPage from "../pages/BookingsPage";
+import ShipmentsPage from "../pages/ShipmentsPage";
+import ShipmentDetailsPage from "../pages/ShipmentDetailsPage";
+import DeliveryOperationsPage from "../pages/DeliveryOperationsPage";
+import FleetPage from "../pages/FleetPage";
 import ModulePage from "../pages/ModulePage";
 
 const internalRoles = ["Admin", "OperationsDispatcher"];
 
 const modules = [
-    { path: "fleet", title: "Fleet & Capacity Planning", description: "Manage vehicles, driver assignments and shipment allocation." },
+    { path: "fleet", title: "Fleet & Capacity Planning", description: "Manage vehicles, driver assignments and shipment allocation.", component: FleetPage },
     { path: "load-optimization", title: "3D Load Optimization", description: "Priority-aware 3D cargo packing for the selected vehicle and shipment group." },
     { path: "compliance", title: "Compliance & E-Way Bill Management", description: "Manage shipment documents, E-Way Bill validity and compliance checks." },
     { path: "routes", title: "Route & Transportation Planning", description: "Plan trips, compare routes and check delivery feasibility and E-Way Bill validity." },
@@ -64,6 +68,9 @@ function AppRoutes() {
                     <Route path="overview" element={<CommandCenterPage />} />
                     <Route path="bookings" element={<BookingsPage />} />
                     <Route path="bookings/new" element={<BookingsPage />} />
+                    <Route path="shipments" element={<ShipmentsPage />} />
+                    <Route path="deliveries" element={<DeliveryOperationsPage />} />
+                    <Route path="shipments/:id" element={<ShipmentDetailsPage />} />
 
                     <Route element={<ProtectedRoute allowedRoles={["Admin"]} />}>
                         <Route path="customers" element={<CustomersPage />} />
@@ -93,3 +100,7 @@ function AppRoutes() {
 }
 
 export default AppRoutes;
+
+
+
+

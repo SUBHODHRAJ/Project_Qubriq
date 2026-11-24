@@ -1,6 +1,7 @@
 ﻿import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { bookingService } from "../services/bookingService";
+import { dispatcherService } from "../services/dispatcherService";
 import { useAuth } from "../context/AuthContext";
 import "../styles/bookings.css";
 import "../styles/dashboard.css";
@@ -146,6 +147,24 @@ function BookingsPage() {
             cancelled = true;
         };
     }, [showForm, canSelectCustomer]);
+    async function updateBookingStatus(booking, targetStatus) {
+        const confirmed = window.confirm(
+            `Change ${booking.bookingId} to ${targetStatus}?`
+        );
+
+        if (!confirmed) return;
+
+        setError("");
+        setSuccess("");
+
+        try {
+            await dispatcherService.updateBookingStatus(booking.id, targetStatus);
+            setSuccess(`${booking.bookingId} updated to ${targetStatus}.`);
+            setReloadToken((value) => value + 1);
+        } catch (err) {
+            setError(err.message || "Unable to update booking status.");
+        }
+    }
     function openCreateForm() {
         setForm(emptyForm);
         setFormError("");
@@ -392,6 +411,19 @@ function BookingsPage() {
                                             <span className={statusClass(booking.status)}>
                                                 {booking.status || "Unknown"}
                                             </span>
+                                            {canSelectCustomer && (
+                                                <div className="dispatcher-booking-actions">
+                                                    {booking.status === "Draft" && (
+                                                        <>
+                                                            <button type="button" className="dispatcher-inline-button" onClick={() => updateBookingStatus(booking, "Confirmed")}>Confirm</button>
+                                                            <button type="button" className="dispatcher-inline-button danger" onClick={() => updateBookingStatus(booking, "Rejected")}>Reject</button>
+                                                        </>
+                                                    )}
+                                                    {(booking.status === "Draft" || booking.status === "Confirmed") && (
+                                                        <button type="button" className="dispatcher-inline-button danger" onClick={() => updateBookingStatus(booking, "Cancelled")}>Cancel</button>
+                                                    )}
+                                                </div>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}
@@ -746,3 +778,4 @@ function BookingsPage() {
 }
 
 export default BookingsPage;
+
