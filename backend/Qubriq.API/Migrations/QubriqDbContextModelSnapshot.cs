@@ -19,6 +19,53 @@ namespace Qubriq.API.Migrations
                 .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
 
+            modelBuilder.Entity("Qubriq.API.Models.AccountRegistrationPolicy", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("ActivatePublicAccountsImmediately")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("AdminAccountCreationEnabled")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("BookingCustomerSignupEnabled")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("FinalRecipientSignupEnabled")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("PublicRegistrationEnabled")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("RequireAdminApproval")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<long?>("UpdatedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("AccountRegistrationPolicies", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            ActivatePublicAccountsImmediately = true,
+                            AdminAccountCreationEnabled = true,
+                            BookingCustomerSignupEnabled = true,
+                            FinalRecipientSignupEnabled = false,
+                            PublicRegistrationEnabled = true,
+                            RequireAdminApproval = false,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        });
+                });
+
             modelBuilder.Entity("Qubriq.API.Models.AuditLog", b =>
                 {
                     b.Property<long>("Id")
@@ -736,6 +783,9 @@ namespace Qubriq.API.Migrations
                     b.Property<string>("RecipientType")
                         .HasMaxLength(30)
                         .HasColumnType("varchar(30)");
+
+                    b.Property<bool>("RequiresAdminApproval")
+                        .HasColumnType("tinyint(1)");
 
                     b.Property<DateTime?>("UpdatedAtUtc")
                         .HasColumnType("datetime(6)");

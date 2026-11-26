@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -58,6 +58,9 @@ public class AdminRecipientsController : ControllerBase
     public async Task<IActionResult> CreateRecipient(
         [FromBody] CreateRecipientRequest request)
     {
+        var accountPolicy = await _db.AccountRegistrationPolicies.FirstOrDefaultAsync(x => x.Id == 1);
+        if (accountPolicy == null || !accountPolicy.AdminAccountCreationEnabled)
+            return StatusCode(403, new { message = "Administrator account creation is disabled by policy." });
         if (!await HasPermission("users.create") ||
             !await HasPermission("users.assign_role"))
             return Forbid();
@@ -185,3 +188,4 @@ public class AdminRecipientsController : ControllerBase
         });
     }
 }
+

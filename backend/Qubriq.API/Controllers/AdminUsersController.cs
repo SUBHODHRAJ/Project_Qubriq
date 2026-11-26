@@ -54,6 +54,9 @@ public class AdminUsersController : ControllerBase
     public async Task<IActionResult> CreateOperationsDispatcher(
         [FromBody] CreateOperationsDispatcherRequest request)
     {
+        var accountPolicy = await _db.AccountRegistrationPolicies.FirstOrDefaultAsync(x => x.Id == 1);
+        if (accountPolicy == null || !accountPolicy.AdminAccountCreationEnabled)
+            return StatusCode(403, new { message = "Administrator account creation is disabled by policy." });
         if (!await HasPermission("users.create") ||
             !await HasPermission("users.assign_role"))
         {
@@ -221,3 +224,4 @@ public class AdminUsersController : ControllerBase
         }
     }
 }
+

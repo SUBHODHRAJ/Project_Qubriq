@@ -16,7 +16,8 @@ public class User
     public string? RecipientType { get; set; }
 
     public bool IsActive { get; set; } = true;
-
+
+    public bool RequiresAdminApproval { get; set; } = false;
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 
     public DateTime? UpdatedAtUtc { get; set; }

@@ -32,6 +32,7 @@ builder.Services.AddDbContext<QubriqDbContext>(options =>
 // ==========================================
 
 builder.Services.AddScoped<AuthService>();
+    builder.Services.AddScoped<RegistrationPolicyService>();
 builder.Services.AddScoped<ILoadOptimizationService, LoadOptimizationService>();
 builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 
@@ -225,4 +226,5 @@ app.MapGet("/", () => Results.Ok(new
 }));
 
 app.Run();
+
 
