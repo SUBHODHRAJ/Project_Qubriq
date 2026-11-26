@@ -1,0 +1,1819 @@
+===== BATCH 1 BACKEND INSPECTION =====
+
+
+========== S:\Project_Qubriq\backend\Qubriq.API\Controllers\LoadOptimizationController.cs ==========
+
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Qubriq.API.Data;
+using Qubriq.API.DTOs.LoadOptimization;
+using Qubriq.API.Services.LoadOptimization;
+
+namespace Qubriq.API.Controllers;
+
+[ApiController]
+[Route("api/load-optimization")]
+[Authorize(Roles = "Admin,OperationsDispatcher")]
+public sealed class LoadOptimizationController : ControllerBase
+{
+    private const string RequiredPermission = "fleet.load_optimization.run";
+
+    private readonly QubriqDbContext _db;
+    private readonly ILoadOptimizationService _optimizationService;
+
+    public LoadOptimizationController(
+        QubriqDbContext db,
+        ILoadOptimizationService optimizationService)
+    {
+        _db = db;
+        _optimizationService = optimizationService;
+    }
+
+    private long? UserId()
+    {
+        var value = User.FindFirst("sub")?.Value
+            ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        return long.TryParse(value, out var id) ? id : null;
+    }
+
+    private async Task<bool> Allowed()
+    {
+        var id = UserId();
+
+        if (!id.HasValue)
+            return false;
+
+        var activeUser = await _db.Users
+            .AnyAsync(x => x.Id == id.Value && x.IsActive);
+
+        if (!activeUser)
+            return false;
+
+        return await _db.UserRoles
+            .Where(x => x.UserId == id.Value)
+            .Join(
+                _db.RolePermissions,
+                userRole => userRole.RoleId,
+                rolePermission => rolePermission.RoleId,
+                (_, rolePermission) => rolePermission)
+            .AnyAsync(x =>
+                x.IsAllowed &&
+                x.Permission.Code == RequiredPermission);
+    }
+
+    [HttpPost("optimize")]
+    public async Task<IActionResult> Optimize(
+        [FromBody] LoadOptimizationRequest request)
+    {
+        if (!await Allowed())
+            return Forbid();
+
+        try
+        {
+            var result = _optimizationService.Optimize(request);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new
+            {
+                message = ex.Message
+            });
+        }
+    }
+}
+
+
+========== S:\Project_Qubriq\backend\Qubriq.API\Data\QubriqDbContext.cs ==========
+
+using Microsoft.EntityFrameworkCore;
+using Qubriq.API.Models;
+
+namespace Qubriq.API.Data;
+
+public class QubriqDbContext : DbContext
+{
+    public QubriqDbContext(DbContextOptions<QubriqDbContext> options)
+        : base(options)
+    {
+    }
+
+    public DbSet<User> Users => Set<User>();
+    public DbSet<Role> Roles => Set<Role>();
+    public DbSet<UserRole> UserRoles => Set<UserRole>();
+    public DbSet<Permission> Permissions => Set<Permission>();
+    public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+    public DbSet<ExternalLogin> ExternalLogins => Set<ExternalLogin>();
+    public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<Shipment> Shipments => Set<Shipment>();
+    public DbSet<Vehicle> Vehicles => Set<Vehicle>();
+    public DbSet<Driver> Drivers => Set<Driver>();
+    public DbSet<ShipmentAssignment> ShipmentAssignments => Set<ShipmentAssignment>();
+    public DbSet<ShipmentRecipient> ShipmentRecipients => Set<ShipmentRecipient>();
+    public DbSet<DeliveryProof> DeliveryProofs => Set<DeliveryProof>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+
+    public DbSet<ShipmentPackage> ShipmentPackages => Set<ShipmentPackage>();
+    public DbSet<OptimizationRun> OptimizationRuns => Set<OptimizationRun>();
+    public DbSet<PackagePlacement> PackagePlacements => Set<PackagePlacement>();
+    public DbSet<LoadingPlanApproval> LoadingPlanApprovals => Set<LoadingPlanApproval>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        // ==========================================
+        // USERS
+        // ==========================================
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.ToTable("Users");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.FullName)
+                .HasMaxLength(150)
+                .IsRequired();
+
+            entity.Property(x => x.Email)
+                .HasMaxLength(254)
+                .IsRequired();
+
+            entity.Property(x => x.PasswordHash)
+                .HasMaxLength(500)
+                .IsRequired(false);
+
+            entity.Property(x => x.RecipientType)
+                .HasMaxLength(30);
+
+            entity.HasIndex(x => x.Email).IsUnique();
+
+            entity.HasOne(x => x.Customer)
+                .WithOne(x => x.User)
+                .HasForeignKey<Customer>(x => x.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.Driver)
+                .WithOne(x => x.User)
+                .HasForeignKey<Driver>(x => x.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ==========================================
+        // ROLES
+        // ==========================================
+
+        modelBuilder.Entity<Role>(entity =>
+        {
+            entity.ToTable("Roles");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Name)
+                .HasMaxLength(60)
+                .IsRequired();
+
+            entity.Property(x => x.Description)
+                .HasMaxLength(250);
+
+            entity.HasIndex(x => x.Name).IsUnique();
+        });
+
+        // ==========================================
+        // USER ROLES
+        // ==========================================
+
+        modelBuilder.Entity<UserRole>(entity =>
+        {
+            entity.ToTable("UserRoles");
+            entity.HasKey(x => new { x.UserId, x.RoleId });
+
+            entity.HasOne(x => x.User)
+                .WithMany(x => x.UserRoles)
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.Role)
+                .WithMany(x => x.UserRoles)
+                .HasForeignKey(x => x.RoleId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ==========================================
+        // PERMISSIONS
+        // ==========================================
+
+        modelBuilder.Entity<Permission>(entity =>
+        {
+            entity.ToTable("Permissions");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Code)
+                .HasMaxLength(120)
+                .IsRequired();
+
+            entity.Property(x => x.Module)
+                .HasMaxLength(80)
+                .IsRequired();
+
+            entity.Property(x => x.Action)
+                .HasMaxLength(80)
+                .IsRequired();
+
+            entity.Property(x => x.Description)
+                .HasMaxLength(300);
+
+            entity.HasIndex(x => x.Code).IsUnique();
+        });
+
+        // ==========================================
+        // ROLE PERMISSIONS
+        // ==========================================
+
+        modelBuilder.Entity<RolePermission>(entity =>
+        {
+            entity.ToTable("RolePermissions");
+            entity.HasKey(x => new { x.RoleId, x.PermissionId });
+
+            entity.HasOne(x => x.Role)
+                .WithMany(x => x.RolePermissions)
+                .HasForeignKey(x => x.RoleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.Permission)
+                .WithMany(x => x.RolePermissions)
+                .HasForeignKey(x => x.PermissionId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ==========================================
+        // EXTERNAL LOGINS
+        // ==========================================
+
+        modelBuilder.Entity<ExternalLogin>(entity =>
+        {
+            entity.ToTable("ExternalLogins");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Provider)
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(x => x.ProviderSubject)
+                .HasMaxLength(255)
+                .IsRequired();
+
+            entity.HasIndex(x => new
+            {
+                x.Provider,
+                x.ProviderSubject
+            }).IsUnique();
+
+            entity.HasIndex(x => x.UserId);
+
+            entity.HasOne(x => x.User)
+                .WithMany(x => x.ExternalLogins)
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ==========================================
+        // CUSTOMERS
+        // ==========================================
+
+        modelBuilder.Entity<Customer>(entity =>
+        {
+            entity.ToTable("Customers");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.CompanyName)
+                .HasMaxLength(200)
+                .IsRequired();
+
+            entity.Property(x => x.ContactName).HasMaxLength(150);
+            entity.Property(x => x.Email).HasMaxLength(254);
+            entity.Property(x => x.Phone).HasMaxLength(30);
+            entity.Property(x => x.Address).HasMaxLength(500);
+
+            entity.HasIndex(x => x.UserId).IsUnique();
+        });
+
+        // ==========================================
+        // SHIPMENTS
+        // ==========================================
+
+        modelBuilder.Entity<Shipment>(entity =>
+        {
+            entity.ToTable("Shipments");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.TrackingNumber)
+                .HasMaxLength(60)
+                .IsRequired();
+
+            entity.Property(x => x.Origin)
+                .HasMaxLength(250)
+                .IsRequired();
+
+            entity.Property(x => x.Destination)
+                .HasMaxLength(250)
+                .IsRequired();
+
+            entity.Property(x => x.Status)
+                .HasMaxLength(40)
+                .IsRequired();
+
+            // Existing booking details
+            entity.Property(x => x.CargoName)
+                .HasMaxLength(200)
+                .IsRequired(false);
+
+            entity.Property(x => x.CargoCategory).HasMaxLength(100);
+            entity.Property(x => x.PackageCount).IsRequired(false);
+
+            entity.Property(x => x.TotalWeightKg)
+                .HasPrecision(12, 2)
+                .IsRequired(false);
+
+            entity.Property(x => x.LengthCm).HasPrecision(12, 2);
+            entity.Property(x => x.WidthCm).HasPrecision(12, 2);
+            entity.Property(x => x.HeightCm).HasPrecision(12, 2);
+
+            entity.Property(x => x.IsFragile).IsRequired(false);
+
+            entity.Property(x => x.SpecialHandlingRequirements)
+                .HasMaxLength(500);
+
+            entity.Property(x => x.Priority)
+                .HasMaxLength(20)
+                .IsRequired(false);
+
+            entity.Property(x => x.PickupDateUtc).IsRequired(false);
+            entity.Property(x => x.DeliveryTimeWindow).HasMaxLength(100);
+            entity.Property(x => x.AdditionalInstructions).HasMaxLength(1000);
+
+            entity.HasIndex(x => x.TrackingNumber).IsUnique();
+
+            entity.HasOne(x => x.Customer)
+                .WithMany(x => x.Shipments)
+                .HasForeignKey(x => x.CustomerId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ==========================================
+        // VEHICLES
+        // ==========================================
+
+        modelBuilder.Entity<Vehicle>(entity =>
+        {
+            entity.ToTable("Vehicles");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.RegistrationNumber)
+                .HasMaxLength(30)
+                .IsRequired();
+
+            entity.Property(x => x.VehicleType)
+                .HasMaxLength(80)
+                .IsRequired();
+
+            entity.Property(x => x.CapacityKg)
+                .HasColumnType("decimal(12,2)");
+
+            entity.Property(x => x.CargoLengthCm)
+                .HasPrecision(12, 2)
+                .IsRequired(false);
+
+            entity.Property(x => x.CargoWidthCm)
+                .HasPrecision(12, 2)
+                .IsRequired(false);
+
+            entity.Property(x => x.CargoHeightCm)
+                .HasPrecision(12, 2)
+                .IsRequired(false);
+
+            entity.Property(x => x.Status)
+                .HasMaxLength(40)
+                .IsRequired();
+
+            entity.HasIndex(x => x.RegistrationNumber).IsUnique();
+        });
+
+        // ==========================================
+        // SHIPMENT PACKAGES
+        // ==========================================
+
+        modelBuilder.Entity<ShipmentPackage>(entity =>
+        {
+            entity.ToTable("ShipmentPackages");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Description)
+                .HasMaxLength(250)
+                .IsRequired();
+
+            entity.Property(x => x.PackageCode).HasMaxLength(80);
+            entity.Property(x => x.Category).HasMaxLength(100);
+            entity.Property(x => x.Quantity).IsRequired();
+
+            entity.Property(x => x.LengthCm).HasPrecision(12, 2);
+            entity.Property(x => x.WidthCm).HasPrecision(12, 2);
+            entity.Property(x => x.HeightCm).HasPrecision(12, 2);
+            entity.Property(x => x.WeightKg).HasPrecision(12, 2);
+
+            entity.Property(x => x.SpecialHandlingRequirements)
+                .HasMaxLength(500);
+
+            entity.HasOne(x => x.Shipment)
+                .WithMany(x => x.Packages)
+                .HasForeignKey(x => x.ShipmentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(x => x.ShipmentId);
+        });
+
+        // ==========================================
+        // OPTIMIZATION RUNS
+        // ==========================================
+
+        modelBuilder.Entity<OptimizationRun>(entity =>
+        {
+            entity.ToTable("OptimizationRuns");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Algorithm)
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.Property(x => x.Status)
+                .HasMaxLength(40)
+                .IsRequired();
+
+            entity.Property(x => x.VehicleLengthCm).HasPrecision(12, 2);
+            entity.Property(x => x.VehicleWidthCm).HasPrecision(12, 2);
+            entity.Property(x => x.VehicleHeightCm).HasPrecision(12, 2);
+            entity.Property(x => x.VehicleCapacityKg).HasPrecision(12, 2);
+
+            entity.Property(x => x.TotalWeightKg).HasPrecision(12, 2);
+            entity.Property(x => x.UsedWeightKg).HasPrecision(12, 2);
+            entity.Property(x => x.WeightUtilizationPercent).HasPrecision(8, 2);
+            entity.Property(x => x.VolumeUtilizationPercent).HasPrecision(8, 2);
+
+            entity.Property(x => x.Warnings)
+                .HasColumnType("longtext");
+
+            entity.HasOne(x => x.Shipment)
+                .WithMany(x => x.OptimizationRuns)
+                .HasForeignKey(x => x.ShipmentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.Vehicle)
+                .WithMany(x => x.OptimizationRuns)
+                .HasForeignKey(x => x.VehicleId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(x => x.ShipmentId);
+            entity.HasIndex(x => x.VehicleId);
+            entity.HasIndex(x => x.CreatedByUserId);
+            entity.HasIndex(x => x.CreatedAtUtc);
+        });
+
+        // ==========================================
+        // PACKAGE PLACEMENTS
+        // ==========================================
+
+        modelBuilder.Entity<PackagePlacement>(entity =>
+        {
+            entity.ToTable("PackagePlacements");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.PackageDescription)
+                .HasMaxLength(250)
+                .IsRequired();
+
+            entity.Property(x => x.LengthCm).HasPrecision(12, 2);
+            entity.Property(x => x.WidthCm).HasPrecision(12, 2);
+            entity.Property(x => x.HeightCm).HasPrecision(12, 2);
+            entity.Property(x => x.WeightKg).HasPrecision(12, 2);
+
+            entity.Property(x => x.PlacementStatus)
+                .HasMaxLength(20)
+                .IsRequired();
+
+            entity.Property(x => x.X).HasPrecision(12, 2);
+            entity.Property(x => x.Y).HasPrecision(12, 2);
+            entity.Property(x => x.Z).HasPrecision(12, 2);
+
+            entity.Property(x => x.Orientation).HasMaxLength(60);
+            entity.Property(x => x.UnplacedReason).HasMaxLength(500);
+
+            entity.HasOne(x => x.OptimizationRun)
+                .WithMany(x => x.Placements)
+                .HasForeignKey(x => x.OptimizationRunId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.ShipmentPackage)
+                .WithMany(x => x.Placements)
+                .HasForeignKey(x => x.ShipmentPackageId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(x => x.OptimizationRunId);
+            entity.HasIndex(x => x.ShipmentPackageId);
+
+            entity.HasIndex(x => new
+            {
+                x.OptimizationRunId,
+                x.ShipmentPackageId,
+                x.UnitNumber
+            }).IsUnique();
+        });
+
+        // ==========================================
+        // LOADING PLAN APPROVALS
+        // ==========================================
+
+        modelBuilder.Entity<LoadingPlanApproval>(entity =>
+        {
+            entity.ToTable("LoadingPlanApprovals");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Decision)
+                .HasMaxLength(20)
+                .IsRequired();
+
+            entity.Property(x => x.Comments).HasMaxLength(1000);
+
+            entity.HasOne(x => x.OptimizationRun)
+                .WithMany(x => x.Approvals)
+                .HasForeignKey(x => x.OptimizationRunId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.ReviewedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.ReviewedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(x => x.OptimizationRunId);
+            entity.HasIndex(x => x.ReviewedByUserId);
+            entity.HasIndex(x => x.ReviewedAtUtc);
+        });
+        // ==========================================
+        // DRIVERS
+        // ==========================================
+
+        modelBuilder.Entity<Driver>(entity =>
+        {
+            entity.ToTable("Drivers");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.FullName)
+                .HasMaxLength(150)
+                .IsRequired();
+
+            entity.Property(x => x.Phone).HasMaxLength(30);
+
+            entity.Property(x => x.LicenseNumber)
+                .HasMaxLength(60)
+                .IsRequired();
+
+            entity.Property(x => x.Status)
+                .HasMaxLength(40)
+                .IsRequired();
+
+            entity.HasIndex(x => x.LicenseNumber).IsUnique();
+            entity.HasIndex(x => x.UserId).IsUnique();
+        });
+
+        // ==========================================
+        // SHIPMENT ASSIGNMENTS
+        // ==========================================
+
+        modelBuilder.Entity<ShipmentAssignment>(entity =>
+        {
+            entity.ToTable("ShipmentAssignments");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Status)
+                .HasMaxLength(40)
+                .IsRequired();
+
+            entity.HasOne(x => x.Shipment)
+                .WithMany(x => x.Assignments)
+                .HasForeignKey(x => x.ShipmentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.Vehicle)
+                .WithMany(x => x.Assignments)
+                .HasForeignKey(x => x.VehicleId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.Driver)
+                .WithMany(x => x.Assignments)
+                .HasForeignKey(x => x.DriverId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(x => x.ShipmentId);
+            entity.HasIndex(x => x.VehicleId);
+            entity.HasIndex(x => x.DriverId);
+        });
+
+        // ==========================================
+        // SHIPMENT RECIPIENTS
+        // ==========================================
+
+        modelBuilder.Entity<ShipmentRecipient>(entity =>
+        {
+            entity.ToTable("ShipmentRecipients");
+            entity.HasKey(x => x.Id);
+
+            entity.HasOne(x => x.Shipment)
+                .WithMany()
+                .HasForeignKey(x => x.ShipmentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.User)
+                .WithMany(x => x.ShipmentRecipients)
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(x => new
+            {
+                x.ShipmentId,
+                x.UserId
+            }).IsUnique();
+        });
+
+        // ==========================================
+        // DELIVERY PROOFS
+        // ==========================================
+
+        modelBuilder.Entity<DeliveryProof>(entity =>
+        {
+            entity.ToTable("DeliveryProofs");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.ProofType)
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(x => x.FileReference)
+                .HasMaxLength(500);
+
+            entity.Property(x => x.Remarks)
+                .HasMaxLength(1000);
+
+            entity.HasOne(x => x.Shipment)
+                .WithMany()
+                .HasForeignKey(x => x.ShipmentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.SubmittedByUser)
+                .WithMany(x => x.DeliveryProofs)
+                .HasForeignKey(x => x.SubmittedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(x => x.ShipmentId);
+            entity.HasIndex(x => x.SubmittedByUserId);
+        });
+
+        // ==========================================
+        // AUDIT LOGS
+        // ==========================================
+
+        modelBuilder.Entity<AuditLog>(entity =>
+        {
+            entity.ToTable("AuditLogs");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Action)
+                .HasMaxLength(120)
+                .IsRequired();
+
+            entity.Property(x => x.EntityType)
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.Property(x => x.EntityId)
+                .HasMaxLength(100);
+
+            entity.Property(x => x.Details)
+                .HasColumnType("longtext");
+
+            entity.HasOne(x => x.User)
+                .WithMany(x => x.AuditLogs)
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(x => x.UserId);
+            entity.HasIndex(x => x.CreatedAtUtc);
+            entity.HasIndex(x => new
+            {
+                x.EntityType,
+                x.EntityId
+            });
+        });
+    }
+}
+
+
+
+========== S:\Project_Qubriq\backend\Qubriq.API\DTOs\LoadOptimization\LoadOptimizationRequest.cs ==========
+
+using System.ComponentModel.DataAnnotations;
+
+namespace Qubriq.API.DTOs.LoadOptimization;
+
+public sealed class LoadOptimizationRequest
+{
+    [Required]
+    [Range(typeof(decimal), "1", "100000")]
+    public decimal VehicleLengthCm { get; set; }
+
+    [Required]
+    [Range(typeof(decimal), "1", "100000")]
+    public decimal VehicleWidthCm { get; set; }
+
+    [Required]
+    [Range(typeof(decimal), "1", "100000")]
+    public decimal VehicleHeightCm { get; set; }
+
+    [Required]
+    [Range(typeof(decimal), "0.01", "100000000")]
+    public decimal MaxPayloadKg { get; set; }
+
+    [Required]
+    [MinLength(1)]
+    public List<PackageInputDto> Packages { get; set; } = new();
+}
+
+public sealed class PackageInputDto
+{
+    [Required]
+    [StringLength(80, MinimumLength = 1)]
+    public string PackageId { get; set; } = string.Empty;
+
+    [StringLength(150)]
+    public string? Description { get; set; }
+
+    [Range(typeof(decimal), "0.1", "100000")]
+    public decimal LengthCm { get; set; }
+
+    [Range(typeof(decimal), "0.1", "100000")]
+    public decimal WidthCm { get; set; }
+
+    [Range(typeof(decimal), "0.1", "100000")]
+    public decimal HeightCm { get; set; }
+
+    [Range(typeof(decimal), "0.01", "1000000")]
+    public decimal WeightKg { get; set; }
+
+    [Range(1, 200)]
+    public int Quantity { get; set; } = 1;
+
+    public bool IsFragile { get; set; }
+}
+
+
+========== S:\Project_Qubriq\backend\Qubriq.API\DTOs\LoadOptimization\LoadOptimizationResponse.cs ==========
+
+namespace Qubriq.API.DTOs.LoadOptimization;
+
+public sealed class LoadOptimizationResponse
+{
+    public string Algorithm { get; set; } = "ExtremePoint3D-Heuristic";
+
+    public bool IsFeasible { get; set; }
+
+    public string Status { get; set; } = string.Empty;
+
+    public VehicleSpaceDto Vehicle { get; set; } = new();
+
+    public int TotalPackages { get; set; }
+
+    public int PlacedPackages { get; set; }
+
+    public int UnplacedPackages { get; set; }
+
+    public decimal TotalCargoWeightKg { get; set; }
+
+    public decimal PlacedCargoWeightKg { get; set; }
+
+    public decimal RemainingPayloadKg { get; set; }
+
+    public decimal VolumeUtilizationPercent { get; set; }
+
+    public decimal PayloadUtilizationPercent { get; set; }
+
+    public List<PackagePlacementDto> Placements { get; set; } = new();
+
+    public List<UnplacedPackageDto> UnplacedItems { get; set; } = new();
+
+    public List<string> Warnings { get; set; } = new();
+}
+
+public sealed class VehicleSpaceDto
+{
+    public decimal LengthCm { get; set; }
+
+    public decimal WidthCm { get; set; }
+
+    public decimal HeightCm { get; set; }
+
+    public decimal MaxPayloadKg { get; set; }
+
+    public decimal UsedVolumeCm3 { get; set; }
+
+    public decimal TotalVolumeCm3 { get; set; }
+}
+
+public sealed class PackagePlacementDto
+{
+    public string PackageId { get; set; } = string.Empty;
+
+    public string? Description { get; set; }
+
+    public int UnitNumber { get; set; }
+
+    public decimal X { get; set; }
+
+    public decimal Y { get; set; }
+
+    public decimal Z { get; set; }
+
+    public decimal LengthCm { get; set; }
+
+    public decimal WidthCm { get; set; }
+
+    public decimal HeightCm { get; set; }
+
+    public decimal WeightKg { get; set; }
+
+    public bool IsFragile { get; set; }
+
+    public string Orientation { get; set; } = string.Empty;
+}
+
+public sealed class UnplacedPackageDto
+{
+    public string PackageId { get; set; } = string.Empty;
+
+    public string? Description { get; set; }
+
+    public int UnitNumber { get; set; }
+
+    public decimal WeightKg { get; set; }
+
+    public string Reason { get; set; } = string.Empty;
+}
+
+
+========== S:\Project_Qubriq\backend\Qubriq.API\Models\LoadingPlanApproval.cs ==========
+
+namespace Qubriq.API.Models;
+
+public class LoadingPlanApproval
+{
+    public long Id { get; set; }
+
+    public long OptimizationRunId { get; set; }
+
+    public long ReviewedByUserId { get; set; }
+
+    // Approved or Rejected
+    public string Decision { get; set; } = string.Empty;
+
+    public string? Comments { get; set; }
+
+    public DateTime ReviewedAtUtc { get; set; } = DateTime.UtcNow;
+
+    public OptimizationRun OptimizationRun { get; set; } = null!;
+
+    public User ReviewedByUser { get; set; } = null!;
+}
+
+
+========== S:\Project_Qubriq\backend\Qubriq.API\Models\OptimizationRun.cs ==========
+
+namespace Qubriq.API.Models;
+
+public class OptimizationRun
+{
+    public long Id { get; set; }
+
+    public long ShipmentId { get; set; }
+
+    public long VehicleId { get; set; }
+
+    public long CreatedByUserId { get; set; }
+
+    public string Algorithm { get; set; } = "ExtremePoint3D-Heuristic";
+
+    public string Status { get; set; } = "Completed";
+
+    public bool IsFeasible { get; set; }
+
+    // Vehicle dimensions and capacity at optimization time
+    public decimal VehicleLengthCm { get; set; }
+
+    public decimal VehicleWidthCm { get; set; }
+
+    public decimal VehicleHeightCm { get; set; }
+
+    public decimal VehicleCapacityKg { get; set; }
+
+    public int TotalPackages { get; set; }
+
+    public int PlacedPackages { get; set; }
+
+    public int UnplacedPackages { get; set; }
+
+    public decimal TotalWeightKg { get; set; }
+
+    public decimal UsedWeightKg { get; set; }
+
+    public decimal WeightUtilizationPercent { get; set; }
+
+    public decimal VolumeUtilizationPercent { get; set; }
+
+    public string? Warnings { get; set; }
+
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+
+    public Shipment Shipment { get; set; } = null!;
+
+    public Vehicle Vehicle { get; set; } = null!;
+
+    public User CreatedByUser { get; set; } = null!;
+
+    public ICollection<PackagePlacement> Placements { get; set; }
+        = new List<PackagePlacement>();
+
+    public ICollection<LoadingPlanApproval> Approvals { get; set; }
+        = new List<LoadingPlanApproval>();
+}
+
+
+========== S:\Project_Qubriq\backend\Qubriq.API\Models\PackagePlacement.cs ==========
+
+namespace Qubriq.API.Models;
+
+public class PackagePlacement
+{
+    public long Id { get; set; }
+
+    public long OptimizationRunId { get; set; }
+
+    public long ShipmentPackageId { get; set; }
+
+    // Identifies an individual unit within a package group
+    public int UnitNumber { get; set; }
+
+    // Snapshot of package details at optimization time
+    public string PackageDescription { get; set; } = string.Empty;
+
+    public decimal LengthCm { get; set; }
+
+    public decimal WidthCm { get; set; }
+
+    public decimal HeightCm { get; set; }
+
+    public decimal WeightKg { get; set; }
+
+    public bool IsFragile { get; set; }
+
+    // Placed or Unplaced
+    public string PlacementStatus { get; set; } = "Unplaced";
+
+    // Coordinates are null for unplaced packages
+    public decimal? X { get; set; }
+
+    public decimal? Y { get; set; }
+
+    public decimal? Z { get; set; }
+
+    public string? Orientation { get; set; }
+
+    public string? UnplacedReason { get; set; }
+
+    public OptimizationRun OptimizationRun { get; set; } = null!;
+
+    public ShipmentPackage ShipmentPackage { get; set; } = null!;
+}
+
+
+========== S:\Project_Qubriq\backend\Qubriq.API\Models\Shipment.cs ==========
+
+namespace Qubriq.API.Models;
+
+public class Shipment
+{
+    public long Id { get; set; }
+
+    public string TrackingNumber { get; set; } = string.Empty;
+
+    public long CustomerId { get; set; }
+
+    public string Origin { get; set; } = string.Empty;
+
+    public string Destination { get; set; } = string.Empty;
+
+    public string Status { get; set; } = "Draft";
+
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+
+    public DateTime? ExpectedDeliveryUtc { get; set; }
+
+    // Cargo details
+    public string? CargoName { get; set; }
+
+    public string? CargoCategory { get; set; }
+
+    public int? PackageCount { get; set; }
+
+    public decimal? TotalWeightKg { get; set; }
+
+    public decimal? LengthCm { get; set; }
+
+    public decimal? WidthCm { get; set; }
+
+    public decimal? HeightCm { get; set; }
+
+    public bool? IsFragile { get; set; }
+
+    public string? SpecialHandlingRequirements { get; set; }
+
+    // Transport details
+    public string? Priority { get; set; }
+
+    public DateTime? PickupDateUtc { get; set; }
+
+    public string? DeliveryTimeWindow { get; set; }
+
+    public string? AdditionalInstructions { get; set; }
+
+    public Customer Customer { get; set; } = null!;
+
+    public ICollection<ShipmentAssignment> Assignments { get; set; }
+        = new List<ShipmentAssignment>();
+
+    public ICollection<ShipmentPackage> Packages { get; set; }
+        = new List<ShipmentPackage>();
+
+    public ICollection<OptimizationRun> OptimizationRuns { get; set; }
+        = new List<OptimizationRun>();
+}
+
+
+
+========== S:\Project_Qubriq\backend\Qubriq.API\Models\ShipmentPackage.cs ==========
+
+namespace Qubriq.API.Models;
+
+public class ShipmentPackage
+{
+    public long Id { get; set; }
+
+    public long ShipmentId { get; set; }
+
+    public string Description { get; set; } = string.Empty;
+
+    public string? PackageCode { get; set; }
+
+    public string? Category { get; set; }
+
+    public int Quantity { get; set; }
+
+    public decimal LengthCm { get; set; }
+
+    public decimal WidthCm { get; set; }
+
+    public decimal HeightCm { get; set; }
+
+    public decimal WeightKg { get; set; }
+
+    public bool IsFragile { get; set; }
+
+    public string? SpecialHandlingRequirements { get; set; }
+
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+
+    public Shipment Shipment { get; set; } = null!;
+
+    public ICollection<PackagePlacement> Placements { get; set; }
+        = new List<PackagePlacement>();
+}
+
+
+========== S:\Project_Qubriq\backend\Qubriq.API\Models\Vehicle.cs ==========
+
+namespace Qubriq.API.Models;
+
+public class Vehicle
+{
+    public long Id { get; set; }
+    public string RegistrationNumber { get; set; } = string.Empty;
+    public string VehicleType { get; set; } = string.Empty;
+    public decimal CapacityKg { get; set; }
+
+    // Internal cargo compartment dimensions in centimetres.
+    // Nullable for compatibility with existing vehicle records.
+    public decimal? CargoLengthCm { get; set; }
+    public decimal? CargoWidthCm { get; set; }
+    public decimal? CargoHeightCm { get; set; }
+
+    public string Status { get; set; } = "Available";
+
+    public ICollection<ShipmentAssignment> Assignments { get; set; }
+        = new List<ShipmentAssignment>();
+
+    public ICollection<OptimizationRun> OptimizationRuns { get; set; }
+        = new List<OptimizationRun>();
+}
+
+
+
+========== S:\Project_Qubriq\backend\Qubriq.API\Program.cs ==========
+
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Qubriq.API.Data;
+using Microsoft.AspNetCore.Authorization;
+using Qubriq.API.Authorization;
+using Qubriq.API.Services;
+using Qubriq.API.Services.LoadOptimization;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddControllers();
+builder.Services.AddOpenApi();
+
+// ==========================================
+// MYSQL DATABASE CONFIGURATION
+// ==========================================
+
+var connectionString = builder.Configuration
+    .GetConnectionString("QubriqDatabase");
+
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException(
+        "QubriqDatabase connection string is missing.");
+}
+
+builder.Services.AddDbContext<QubriqDbContext>(options =>
+    options.UseMySQL(connectionString));
+// ==========================================
+// APPLICATION SERVICES
+// ==========================================
+
+builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<ILoadOptimizationService, LoadOptimizationService>();
+builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
+
+// ==========================================
+// JWT AUTHENTICATION CONFIGURATION
+// ==========================================
+
+var jwtSigningKey = builder.Configuration["Jwt:SigningKey"];
+var jwtIssuer = builder.Configuration["Jwt:Issuer"];
+var jwtAudience = builder.Configuration["Jwt:Audience"];
+
+if (string.IsNullOrWhiteSpace(jwtSigningKey) ||
+    string.IsNullOrWhiteSpace(jwtIssuer) ||
+    string.IsNullOrWhiteSpace(jwtAudience))
+{
+    throw new InvalidOperationException(
+        "JWT configuration is incomplete. Check .NET User Secrets.");
+}
+
+byte[] signingKeyBytes;
+
+try
+{
+    signingKeyBytes = Convert.FromBase64String(jwtSigningKey);
+}
+catch (FormatException)
+{
+    throw new InvalidOperationException(
+        "JWT signing key must be valid Base64.");
+}
+
+if (signingKeyBytes.Length < 32)
+{
+    throw new InvalidOperationException(
+        "JWT signing key must contain at least 32 bytes.");
+}
+
+var signingKey = new SymmetricSecurityKey(signingKeyBytes);
+
+builder.Services
+    .AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme =
+            JwtBearerDefaults.AuthenticationScheme;
+
+        options.DefaultChallengeScheme =
+            JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddJwtBearer(options =>
+    {
+        options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+        options.SaveToken = false;
+        options.MapInboundClaims = false;
+
+        options.TokenValidationParameters =
+            new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = signingKey,
+
+                ValidateIssuer = true,
+                ValidIssuer = jwtIssuer,
+
+                ValidateAudience = true,
+                ValidAudience = jwtAudience,
+
+                ValidateLifetime = true,
+                RequireExpirationTime = true,
+
+                ClockSkew = TimeSpan.FromSeconds(30),
+
+                ValidAlgorithms = new[]
+                {
+                    SecurityAlgorithms.HmacSha256
+                }
+            };
+    });
+
+// ==========================================
+// AUTHORIZATION
+// ==========================================
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("BookingsRead", policy =>
+        policy.RequireAuthenticatedUser()
+            .AddRequirements(new PermissionRequirement(
+                "bookings.read_all",
+                "bookings.read_own")));
+
+    options.AddPolicy("BookingsReadAll", policy =>
+        policy.RequireAuthenticatedUser()
+            .AddRequirements(new PermissionRequirement(
+                "bookings.read_all")));
+
+    options.AddPolicy("BookingsCreate", policy =>
+        policy.RequireAuthenticatedUser()
+            .AddRequirements(new PermissionRequirement(
+                "bookings.create")));
+    options.AddPolicy("AdminCustomerProvision", policy =>
+    {
+        policy.RequireAuthenticatedUser();
+        policy.RequireRole("Admin");
+
+        // Both permissions are required.
+        policy.AddRequirements(
+            new PermissionRequirement("users.create"));
+
+        policy.AddRequirements(
+            new PermissionRequirement("users.assign_role"));
+    });
+});
+
+// ==========================================
+// CORS CONFIGURATION
+// ==========================================
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("QubriqFrontend", policy =>
+    {
+        policy
+            .WithOrigins("http://127.0.0.1:5173")
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
+
+// ==========================================
+// BUILD APPLICATION
+// ==========================================
+
+var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+}
+
+app.UseCors("QubriqFrontend");
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapControllers();
+
+// ==========================================
+// DATABASE HEALTH ENDPOINT
+// ==========================================
+
+app.MapGet("/api/database/health",
+    async (QubriqDbContext dbContext) =>
+    {
+        try
+        {
+            await dbContext.Database.OpenConnectionAsync();
+            await dbContext.Database.CloseConnectionAsync();
+
+            return Results.Ok(new
+            {
+                database = "MySQL",
+                status = "Connected",
+                databaseName = "qubriq_dev"
+            });
+        }
+        catch (Exception ex)
+        {
+            app.Logger.LogError(
+                ex,
+                "Database connectivity check failed.");
+
+            return Results.Problem(
+                title: "Database connection failed",
+                detail: app.Environment.IsDevelopment()
+                    ? ex.GetBaseException().Message
+                    : null,
+                statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+    });
+
+// ==========================================
+// ROOT ENDPOINT
+// ==========================================
+
+app.MapGet("/", () => Results.Ok(new
+{
+    application = "Qubriq API",
+    status = "Running",
+    version = "0.1.0",
+    stage = 2
+}));
+
+app.Run();
+
+
+
+========== S:\Project_Qubriq\backend\Qubriq.API\Services\LoadOptimization\LoadOptimizationService.cs ==========
+
+using Qubriq.API.DTOs.LoadOptimization;
+
+namespace Qubriq.API.Services.LoadOptimization;
+
+public interface ILoadOptimizationService
+{
+    LoadOptimizationResponse Optimize(LoadOptimizationRequest request);
+}
+
+public sealed class LoadOptimizationService : ILoadOptimizationService
+{
+    private const decimal SupportThreshold = 0.80m;
+    private const decimal Epsilon = 0.0001m;
+
+    private sealed class Box
+    {
+        public string PackageId { get; init; } = "";
+        public string? Description { get; init; }
+        public int UnitNumber { get; init; }
+        public decimal X { get; init; }
+        public decimal Y { get; init; }
+        public decimal Z { get; init; }
+        public decimal Length { get; init; }
+        public decimal Width { get; init; }
+        public decimal Height { get; init; }
+        public decimal Weight { get; init; }
+        public bool IsFragile { get; init; }
+
+        public decimal Right => X + Length;
+        public decimal Back => Y + Width;
+        public decimal Top => Z + Height;
+        public decimal Volume => Length * Width * Height;
+    }
+
+    private sealed class Unit
+    {
+        public PackageInputDto Package { get; init; } = new();
+        public int UnitNumber { get; init; }
+    }
+
+    private readonly record struct Point(decimal X, decimal Y, decimal Z);
+
+    private sealed class Orientation
+    {
+        public decimal Length { get; init; }
+        public decimal Width { get; init; }
+        public decimal Height { get; init; }
+        public string Name { get; init; } = "";
+    }
+
+    public LoadOptimizationResponse Optimize(LoadOptimizationRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        ValidateRequest(request);
+
+        var units = request.Packages
+            .SelectMany(package =>
+                Enumerable.Range(1, package.Quantity)
+                    .Select(number => new Unit
+                    {
+                        Package = package,
+                        UnitNumber = number
+                    }))
+            .OrderByDescending(x =>
+                x.Package.LengthCm * x.Package.WidthCm * x.Package.HeightCm)
+            .ThenByDescending(x => x.Package.WeightKg)
+            .ToList();
+
+        var totalWeight = units.Sum(x => x.Package.WeightKg);
+        var vehicleVolume =
+            request.VehicleLengthCm *
+            request.VehicleWidthCm *
+            request.VehicleHeightCm;
+
+        var placements = new List<Box>();
+        var unplaced = new List<UnplacedPackageDto>();
+        var points = new List<Point> { new(0, 0, 0) };
+
+        decimal placedWeight = 0;
+
+        foreach (var unit in units)
+        {
+            var package = unit.Package;
+
+            if (package.WeightKg > request.MaxPayloadKg)
+            {
+                AddUnplaced(
+                    unplaced,
+                    unit,
+                    "Package weight exceeds the vehicle's maximum payload.");
+
+                continue;
+            }
+
+            if (placedWeight + package.WeightKg > request.MaxPayloadKg)
+            {
+                AddUnplaced(
+                    unplaced,
+                    unit,
+                    "Insufficient remaining vehicle payload capacity.");
+
+                continue;
+            }
+
+            var orientations = GetOrientations(package);
+            Box? selected = null;
+            Point selectedPoint = default;
+            Orientation? selectedOrientation = null;
+
+            var orderedPoints = points
+                .Distinct()
+                .OrderBy(p => p.Z)
+                .ThenBy(p => p.Y)
+                .ThenBy(p => p.X)
+                .ToList();
+
+            foreach (var point in orderedPoints)
+            {
+                foreach (var orientation in orientations)
+                {
+                    var candidate = new Box
+                    {
+                        PackageId = package.PackageId,
+                        Description = package.Description,
+                        UnitNumber = unit.UnitNumber,
+                        X = point.X,
+                        Y = point.Y,
+                        Z = point.Z,
+                        Length = orientation.Length,
+                        Width = orientation.Width,
+                        Height = orientation.Height,
+                        Weight = package.WeightKg,
+                        IsFragile = package.IsFragile
+                    };
+
+                    if (!InsideVehicle(candidate, request))
+                        continue;
+
+                    if (placements.Any(existing =>
+                        Intersects(candidate, existing)))
+                        continue;
+
+                    if (!HasStableSupport(candidate, placements))
+                        continue;
+
+                    if (WouldLoadOnFragile(candidate, placements))
+                        continue;
+
+                    selected = candidate;
+                    selectedPoint = point;
+                    selectedOrientation = orientation;
+                    break;
+                }
+
+                if (selected != null)
+                    break;
+            }
+
+            if (selected == null || selectedOrientation == null)
+            {
+                AddUnplaced(
+                    unplaced,
+                    unit,
+                    "No valid position found within the vehicle space and placement constraints.");
+
+                continue;
+            }
+
+            placements.Add(selected);
+            placedWeight += selected.Weight;
+
+            AddPoint(points, new Point(
+                selected.Right, selected.Y, selected.Z));
+
+            AddPoint(points, new Point(
+                selected.X, selected.Back, selected.Z));
+
+            AddPoint(points, new Point(
+                selected.X, selected.Y, selected.Top));
+        }
+
+        var usedVolume = placements.Sum(x => x.Volume);
+
+        var volumeUtilization = vehicleVolume > 0
+            ? usedVolume / vehicleVolume * 100m
+            : 0m;
+
+        var payloadUtilization = request.MaxPayloadKg > 0
+            ? placedWeight / request.MaxPayloadKg * 100m
+            : 0m;
+
+        var isFeasible = unplaced.Count == 0;
+
+        var response = new LoadOptimizationResponse
+        {
+            IsFeasible = isFeasible,
+            Status = isFeasible
+                ? "All packages placed"
+                : placements.Count == 0
+                    ? "No packages could be placed"
+                    : "Partial loading",
+
+            Vehicle = new VehicleSpaceDto
+            {
+                LengthCm = request.VehicleLengthCm,
+                WidthCm = request.VehicleWidthCm,
+                HeightCm = request.VehicleHeightCm,
+                MaxPayloadKg = request.MaxPayloadKg,
+                UsedVolumeCm3 = Round(usedVolume),
+                TotalVolumeCm3 = Round(vehicleVolume)
+            },
+
+            TotalPackages = units.Count,
+            PlacedPackages = placements.Count,
+            UnplacedPackages = unplaced.Count,
+
+            TotalCargoWeightKg = Round(totalWeight),
+            PlacedCargoWeightKg = Round(placedWeight),
+            RemainingPayloadKg = Round(
+                request.MaxPayloadKg - placedWeight),
+
+            VolumeUtilizationPercent = Round(volumeUtilization),
+            PayloadUtilizationPercent = Round(payloadUtilization),
+
+            Placements = placements.Select(box =>
+            {
+                var orientation = GetOrientations(
+                    units.First(x =>
+                        x.Package.PackageId == box.PackageId &&
+                        x.UnitNumber == box.UnitNumber).Package)
+                    .First(x =>
+                        x.Length == box.Length &&
+                        x.Width == box.Width &&
+                        x.Height == box.Height);
+
+                return new PackagePlacementDto
+                {
+                    PackageId = box.PackageId,
+                    Description = box.Description,
+                    UnitNumber = box.UnitNumber,
+                    X = Round(box.X),
+                    Y = Round(box.Y),
+                    Z = Round(box.Z),
+                    LengthCm = Round(box.Length),
+                    WidthCm = Round(box.Width),
+                    HeightCm = Round(box.Height),
+                    WeightKg = Round(box.Weight),
+                    IsFragile = box.IsFragile,
+                    Orientation = orientation.Name
+                };
+            }).ToList(),
+
+            UnplacedItems = unplaced,
+
+            Warnings = new List<string>
+            {
+                "This is a heuristic packing result, not a guaranteed global optimum.",
+                "Package coordinates use centimetres. X = vehicle length, Y = vehicle width, Z = vertical height.",
+                "The support rule requires at least 80% of a raised package's bottom footprint to be supported.",
+                "This initial version does not model axle loads, vehicle suspension, tie-downs or unloading sequence."
+            }
+        };
+
+        return response;
+    }
+
+    private static void ValidateRequest(LoadOptimizationRequest request)
+    {
+        if (request.VehicleLengthCm <= 0 ||
+            request.VehicleWidthCm <= 0 ||
+            request.VehicleHeightCm <= 0 ||
+            request.MaxPayloadKg <= 0)
+        {
+            throw new ArgumentException(
+                "Vehicle dimensions and maximum payload must be positive.");
+        }
+
+        if (request.Packages == null || request.Packages.Count == 0)
+        {
+            throw new ArgumentException(
+                "At least one package is required.");
+        }
+
+        var totalUnits = 0;
+        var packageIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var package in request.Packages)
+        {
+            if (string.IsNullOrWhiteSpace(package.PackageId))
+                throw new ArgumentException("Every package requires a PackageId.");
+
+            if (!packageIds.Add(package.PackageId.Trim()))
+                throw new ArgumentException(
+                    $"Duplicate PackageId '{package.PackageId}'. Each package group must have a unique ID.");
+
+            if (package.LengthCm <= 0 ||
+                package.WidthCm <= 0 ||
+                package.HeightCm <= 0 ||
+                package.WeightKg <= 0)
+            {
+                throw new ArgumentException(
+                    $"Package '{package.PackageId}' has invalid dimensions or weight.");
+            }
+
+            if (package.Quantity < 1 || package.Quantity > 200)
+                throw new ArgumentException(
+                    $"Package '{package.PackageId}' has an invalid quantity.");
+
+            totalUnits += package.Quantity;
+        }
+
+        if (totalUnits > 1000)
+        {
+            throw new ArgumentException(
+                "A maximum of 1000 package units is allowed per optimization request.");
+        }
+    }
+
+    private static List<Orientation> GetOrientations(
+        PackageInputDto package)
+    {
+        var dimensions = new[]
+        {
+            (package.LengthCm, package.WidthCm, package.HeightCm, "L-W-H"),
+            (package.LengthCm, package.HeightCm, package.WidthCm, "L-H-W"),
+            (package.WidthCm, package.LengthCm, package.HeightCm, "W-L-H"),
+            (package.WidthCm, package.HeightCm, package.LengthCm, "W-H-L"),
+            (package.HeightCm, package.LengthCm, package.WidthCm, "H-L-W"),
+            (package.HeightCm, package.WidthCm, package.LengthCm, "H-W-L")
+        };
+
+        return dimensions
+            .Select(x => new Orientation
+            {
+                Length = x.Item1,
+                Width = x.Item2,
+                Height = x.Item3,
+                Name = x.Item4
+            })
+            .GroupBy(x => (x.Length, x.Width, x.Height))
+            .Select(x => x.First())
+            .ToList();
+    }
+
+    private static bool InsideVehicle(
+        Box box,
+        LoadOptimizationRequest request)
+    {
+        return box.X >= 0 &&
+               box.Y >= 0 &&
+               box.Z >= 0 &&
+               box.Right <= request.VehicleLengthCm + Epsilon &&
+               box.Back <= request.VehicleWidthCm + Epsilon &&
+               box.Top <= request.VehicleHeightCm + Epsilon;
+    }
+
+    private static bool Intersects(Box a, Box b)
+    {
+        return a.X < b.Right - Epsilon &&
+               a.Right > b.X + Epsilon &&
+               a.Y < b.Back - Epsilon &&
+               a.Back > b.Y + Epsilon &&
+               a.Z < b.Top - Epsilon &&
+               a.Top > b.Z + Epsilon;
+    }
+
+    private static bool HasStableSupport(
+        Box candidate,
+        List<Box> placements)
+    {
+        if (candidate.Z <= Epsilon)
+            return true;
+
+        var footprintArea = candidate.Length * candidate.Width;
+        if (footprintArea <= 0)
+            return false;
+
+        decimal supportedArea = 0;
+
+        foreach (var support in placements)
+        {
+            if (Math.Abs(support.Top - candidate.Z) > Epsilon)
+                continue;
+
+            var overlapLength = Math.Max(
+                0,
+                Math.Min(candidate.Right, support.Right) -
+                Math.Max(candidate.X, support.X));
+
+            var overlapWidth = Math.Max(
+                0,
+                Math.Min(candidate.Back, support.Back) -
+                Math.Max(candidate.Y, support.Y));
+
+            supportedArea += overlapLength * overlapWidth;
+        }
+
+        return supportedArea / footprintArea >= SupportThreshold;
+    }
+
+    private static bool WouldLoadOnFragile(
+        Box candidate,
+        List<Box> placements)
+    {
+        return placements.Any(existing =>
+            existing.IsFragile &&
+            Math.Abs(existing.Top - candidate.Z) <= Epsilon &&
+            candidate.X < existing.Right - Epsilon &&
+            candidate.Right > existing.X + Epsilon &&
+            candidate.Y < existing.Back - Epsilon &&
+            candidate.Back > existing.Y + Epsilon);
+    }
+
+    private static void AddPoint(List<Point> points, Point point)
+    {
+        if (point.X < 0 || point.Y < 0 || point.Z < 0)
+            return;
+
+        if (!points.Contains(point))
+            points.Add(point);
+    }
+
+    private static void AddUnplaced(
+        List<UnplacedPackageDto> unplaced,
+        Unit unit,
+        string reason)
+    {
+        unplaced.Add(new UnplacedPackageDto
+        {
+            PackageId = unit.Package.PackageId,
+            Description = unit.Package.Description,
+            UnitNumber = unit.UnitNumber,
+            WeightKg = unit.Package.WeightKg,
+            Reason = reason
+        });
+    }
+
+    private static decimal Round(decimal value)
+    {
+        return Math.Round(value, 2, MidpointRounding.AwayFromZero);
+    }
+}
+

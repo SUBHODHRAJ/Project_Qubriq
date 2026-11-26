@@ -1,0 +1,449 @@
+﻿QUBRIQ STAGE 3 - PREPARATION INSPECTION
+
+
+==========================================================================================
+FILE: backend\Qubriq.API\Qubriq.API.csproj
+==========================================================================================
+    1: <Project Sdk="Microsoft.NET.Sdk.Web">
+    2: 
+    3:   <PropertyGroup>
+    4:     <TargetFramework>net10.0</TargetFramework>
+    5:     <Nullable>enable</Nullable>
+    6:     <ImplicitUsings>enable</ImplicitUsings>
+    7:     <UserSecretsId>b170d3c2-39a2-46e0-b1ac-cffab02ad745</UserSecretsId>
+    8:   </PropertyGroup>
+    9: 
+   10:   <ItemGroup>
+   11:     <PackageReference Include="Google.Apis.Auth" Version="1.78.0" />
+   12:     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.15" />
+   13:     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.15" />
+   14:     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12">
+   15:       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+   16:       <PrivateAssets>all</PrivateAssets>
+   17:     </PackageReference>
+   18:     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.12">
+   19:       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+   20:       <PrivateAssets>all</PrivateAssets>
+   21:     </PackageReference>
+   22:     <PackageReference Include="MySql.Data" Version="26.10.0" />
+   23:     <PackageReference Include="MySql.EntityFrameworkCore" Version="10.0.12" />
+   24:   </ItemGroup>
+   25: 
+   26: </Project>
+
+
+==========================================================================================
+FILE: backend\Qubriq.API\Models\Customer.cs
+==========================================================================================
+    1: namespace Qubriq.API.Models;
+    2: 
+    3: public class Customer
+    4: {
+    5:     public long Id { get; set; }
+    6: 
+    7:     public long? UserId { get; set; }
+    8: 
+    9:     public string CompanyName { get; set; } = string.Empty;
+   10: 
+   11:     public string? ContactName { get; set; }
+   12: 
+   13:     public string? Email { get; set; }
+   14: 
+   15:     public string? Phone { get; set; }
+   16: 
+   17:     public string? Address { get; set; }
+   18: 
+   19:     public bool IsActive { get; set; } = true;
+   20: 
+   21:     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+   22: 
+   23:     public User? User { get; set; }
+   24: 
+   25:     public ICollection<Shipment> Shipments { get; set; }
+   26:         = new List<Shipment>();
+   27: }
+
+
+==========================================================================================
+FILE: backend\Qubriq.API\Models\Driver.cs
+==========================================================================================
+    1: namespace Qubriq.API.Models;
+    2: 
+    3: public class Driver
+    4: {
+    5:     public long Id { get; set; }
+    6: 
+    7:     public long? UserId { get; set; }
+    8: 
+    9:     public string FullName { get; set; } = string.Empty;
+   10: 
+   11:     public string? Phone { get; set; }
+   12: 
+   13:     public string LicenseNumber { get; set; } = string.Empty;
+   14: 
+   15:     public string Status { get; set; } = "Available";
+   16: 
+   17:     public User? User { get; set; }
+   18: 
+   19:     public ICollection<ShipmentAssignment> Assignments { get; set; }
+   20:         = new List<ShipmentAssignment>();
+   21: }
+
+
+==========================================================================================
+FILE: backend\Qubriq.API\Models\AuditLog.cs
+==========================================================================================
+    1: namespace Qubriq.API.Models;
+    2: 
+    3: public class AuditLog
+    4: {
+    5:     public long Id { get; set; }
+    6: 
+    7:     public long? UserId { get; set; }
+    8: 
+    9:     public string Action { get; set; } = string.Empty;
+   10: 
+   11:     public string EntityType { get; set; } = string.Empty;
+   12: 
+   13:     public string? EntityId { get; set; }
+   14: 
+   15:     public string? Details { get; set; }
+   16: 
+   17:     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+   18: 
+   19:     public User? User { get; set; }
+   20: }
+
+
+==========================================================================================
+FILE: backend\Qubriq.API\Models\ShipmentAssignment.cs
+==========================================================================================
+    1: namespace Qubriq.API.Models;
+    2: 
+    3: public class ShipmentAssignment
+    4: {
+    5:     public long Id { get; set; }
+    6:     public long ShipmentId { get; set; }
+    7:     public long VehicleId { get; set; }
+    8:     public long DriverId { get; set; }
+    9:     public DateTime AssignedAtUtc { get; set; } = DateTime.UtcNow;
+   10:     public DateTime? ReleasedAtUtc { get; set; }
+   11:     public string Status { get; set; } = "Active";
+   12: 
+   13:     public Shipment Shipment { get; set; } = null!;
+   14:     public Vehicle Vehicle { get; set; } = null!;
+   15:     public Driver Driver { get; set; } = null!;
+   16: }
+
+
+==========================================================================================
+FILE: backend\Qubriq.API\Models\Shipment.cs
+==========================================================================================
+    1: namespace Qubriq.API.Models;
+    2: 
+    3: public class Shipment
+    4: {
+    5:     public long Id { get; set; }
+    6: 
+    7:     public string TrackingNumber { get; set; } = string.Empty;
+    8: 
+    9:     public long CustomerId { get; set; }
+   10: 
+   11:     public string Origin { get; set; } = string.Empty;
+   12: 
+   13:     public string Destination { get; set; } = string.Empty;
+   14: 
+   15:     public string Status { get; set; } = "Draft";
+   16: 
+   17:     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+   18: 
+   19:     public DateTime? ExpectedDeliveryUtc { get; set; }
+   20: 
+   21:     // Cargo details
+   22:     public string? CargoName { get; set; }
+   23: 
+   24:     public string? CargoCategory { get; set; }
+   25: 
+   26:     public int? PackageCount { get; set; }
+   27: 
+   28:     public decimal? TotalWeightKg { get; set; }
+   29: 
+   30:     public decimal? LengthCm { get; set; }
+   31: 
+   32:     public decimal? WidthCm { get; set; }
+   33: 
+   34:     public decimal? HeightCm { get; set; }
+   35: 
+   36:     public bool? IsFragile { get; set; }
+   37: 
+   38:     public string? SpecialHandlingRequirements { get; set; }
+   39: 
+   40:     // Transport details
+   41:     public string? Priority { get; set; }
+   42: 
+   43:     public DateTime? PickupDateUtc { get; set; }
+   44: 
+   45:     public string? DeliveryTimeWindow { get; set; }
+   46: 
+   47:     public string? AdditionalInstructions { get; set; }
+   48: 
+   49:     public Customer Customer { get; set; } = null!;
+   50: 
+   51:     public ICollection<ShipmentAssignment> Assignments { get; set; }
+   52:         = new List<ShipmentAssignment>();
+   53: }
+
+
+==========================================================================================
+FILE: backend\Qubriq.API\Models\Vehicle.cs
+==========================================================================================
+    1: namespace Qubriq.API.Models;
+    2: 
+    3: public class Vehicle
+    4: {
+    5:     public long Id { get; set; }
+    6:     public string RegistrationNumber { get; set; } = string.Empty;
+    7:     public string VehicleType { get; set; } = string.Empty;
+    8:     public decimal CapacityKg { get; set; }
+    9:     public string Status { get; set; } = "Available";
+   10: 
+   11:     public ICollection<ShipmentAssignment> Assignments { get; set; } = new List<ShipmentAssignment>();
+   12: }
+
+
+==========================================================================================
+FILE: backend\Qubriq.API\Data\QubriqDbContext.cs
+==========================================================================================
+    1: using Microsoft.EntityFrameworkCore;
+    2: using Qubriq.API.Models;
+    3: 
+    4: namespace Qubriq.API.Data;
+    5: 
+    6: public class QubriqDbContext : DbContext
+    7: {
+    8:     public QubriqDbContext(DbContextOptions<QubriqDbContext> options)
+    9:         : base(options)
+   10:     {
+   11:     }
+   12: 
+   13:     public DbSet<User> Users => Set<User>();
+   14:     public DbSet<Role> Roles => Set<Role>();
+   15:     public DbSet<UserRole> UserRoles => Set<UserRole>();
+   16:     public DbSet<Permission> Permissions => Set<Permission>();
+   17:     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+   18:     public DbSet<ExternalLogin> ExternalLogins => Set<ExternalLogin>();
+   19:     public DbSet<Customer> Customers => Set<Customer>();
+   20:     public DbSet<Shipment> Shipments => Set<Shipment>();
+   21:     public DbSet<Vehicle> Vehicles => Set<Vehicle>();
+   22:     public DbSet<Driver> Drivers => Set<Driver>();
+   23:     public DbSet<ShipmentAssignment> ShipmentAssignments => Set<ShipmentAssignment>();
+   24:     public DbSet<ShipmentRecipient> ShipmentRecipients => Set<ShipmentRecipient>();
+   25:     public DbSet<DeliveryProof> DeliveryProofs => Set<DeliveryProof>();
+   26:     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+   27: 
+   28:     protected override void OnModelCreating(ModelBuilder modelBuilder)
+   29:     {
+   30:         base.OnModelCreating(modelBuilder);
+   31: 
+   32:         // ==========================================
+   33:         // USERS
+   34:         // ==========================================
+   35: 
+   36:         modelBuilder.Entity<User>(entity =>
+   37:         {
+   38:             entity.ToTable("Users");
+   39:             entity.HasKey(x => x.Id);
+   40: 
+   41:             entity.Property(x => x.FullName)
+   42:                 .HasMaxLength(150)
+   43:                 .IsRequired();
+   44: 
+   45:             entity.Property(x => x.Email)
+   46:                 .HasMaxLength(254)
+   47:                 .IsRequired();
+   48: 
+   49:             entity.Property(x => x.PasswordHash)
+   50:                 .HasMaxLength(500)
+   51:                 .IsRequired(false);
+   52: 
+   53:             entity.Property(x => x.RecipientType)
+   54:                 .HasMaxLength(30);
+   55: 
+   56:             entity.HasIndex(x => x.Email).IsUnique();
+   57: 
+   58:             entity.HasOne(x => x.Customer)
+   59:                 .WithOne(x => x.User)
+   60:                 .HasForeignKey<Customer>(x => x.UserId)
+   61:                 .OnDelete(DeleteBehavior.Restrict);
+   62: 
+   63:             entity.HasOne(x => x.Driver)
+   64:                 .WithOne(x => x.User)
+   65:                 .HasForeignKey<Driver>(x => x.UserId)
+   66:                 .OnDelete(DeleteBehavior.Restrict);
+   67:         });
+   68: 
+   69:         // ==========================================
+   70:         // ROLES
+   71:         // ==========================================
+   72: 
+   73:         modelBuilder.Entity<Role>(entity =>
+   74:         {
+   75:             entity.ToTable("Roles");
+   76:             entity.HasKey(x => x.Id);
+   77: 
+   78:             entity.Property(x => x.Name)
+   79:                 .HasMaxLength(60)
+   80:                 .IsRequired();
+   81: 
+   82:             entity.Property(x => x.Description)
+   83:                 .HasMaxLength(250);
+   84: 
+   85:             entity.HasIndex(x => x.Name).IsUnique();
+   86:         });
+   87: 
+   88:         // ==========================================
+   89:         // USER ROLES
+   90:         // ==========================================
+   91: 
+   92:         modelBuilder.Entity<UserRole>(entity =>
+   93:         {
+   94:             entity.ToTable("UserRoles");
+   95:             entity.HasKey(x => new { x.UserId, x.RoleId });
+   96: 
+   97:             entity.HasOne(x => x.User)
+   98:                 .WithMany(x => x.UserRoles)
+   99:                 .HasForeignKey(x => x.UserId)
+  100:                 .OnDelete(DeleteBehavior.Cascade);
+  101: 
+  102:             entity.HasOne(x => x.Role)
+  103:                 .WithMany(x => x.UserRoles)
+  104:                 .HasForeignKey(x => x.RoleId)
+  105:                 .OnDelete(DeleteBehavior.Restrict);
+  106:         });
+  107: 
+  108:         // ==========================================
+  109:         // PERMISSIONS
+  110:         // ==========================================
+  111: 
+  112:         modelBuilder.Entity<Permission>(entity =>
+  113:         {
+  114:             entity.ToTable("Permissions");
+  115:             entity.HasKey(x => x.Id);
+  116: 
+  117:             entity.Property(x => x.Code)
+  118:                 .HasMaxLength(120)
+  119:                 .IsRequired();
+  120: 
+  121:             entity.Property(x => x.Module)
+  122:                 .HasMaxLength(80)
+  123:                 .IsRequired();
+  124: 
+  125:             entity.Property(x => x.Action)
+  126:                 .HasMaxLength(80)
+  127:                 .IsRequired();
+  128: 
+  129:             entity.Property(x => x.Description)
+  130:                 .HasMaxLength(300);
+  131: 
+  132:             entity.HasIndex(x => x.Code).IsUnique();
+  133:         });
+  134: 
+  135:         // ==========================================
+  136:         // ROLE PERMISSIONS
+  137:         // ==========================================
+  138: 
+  139:         modelBuilder.Entity<RolePermission>(entity =>
+  140:         {
+  141:             entity.ToTable("RolePermissions");
+  142:             entity.HasKey(x => new { x.RoleId, x.PermissionId });
+  143: 
+  144:             entity.HasOne(x => x.Role)
+  145:                 .WithMany(x => x.RolePermissions)
+  146:                 .HasForeignKey(x => x.RoleId)
+  147:                 .OnDelete(DeleteBehavior.Cascade);
+  148: 
+  149:             entity.HasOne(x => x.Permission)
+  150:                 .WithMany(x => x.RolePermissions)
+  151:                 .HasForeignKey(x => x.PermissionId)
+  152:                 .OnDelete(DeleteBehavior.Restrict);
+  153:         });
+  154: 
+  155:         // ==========================================
+  156:         // EXTERNAL LOGINS
+  157:         // ==========================================
+  158: 
+  159:         modelBuilder.Entity<ExternalLogin>(entity =>
+  160:         {
+  161:             entity.ToTable("ExternalLogins");
+  162:             entity.HasKey(x => x.Id);
+  163: 
+  164:             entity.Property(x => x.Provider)
+  165:                 .HasMaxLength(50)
+  166:                 .IsRequired();
+  167: 
+  168:             entity.Property(x => x.ProviderSubject)
+  169:                 .HasMaxLength(255)
+  170:                 .IsRequired();
+  171: 
+  172:             entity.HasIndex(x => new
+  173:             {
+  174:                 x.Provider,
+  175:                 x.ProviderSubject
+  176:             }).IsUnique();
+  177: 
+  178:             entity.HasIndex(x => x.UserId);
+  179: 
+  180:             entity.HasOne(x => x.User)
+  181:                 .WithMany(x => x.ExternalLogins)
+  182:                 .HasForeignKey(x => x.UserId)
+  183:                 .OnDelete(DeleteBehavior.Restrict);
+  184:         });
+  185: 
+  186:         // ==========================================
+  187:         // CUSTOMERS
+  188:         // ==========================================
+  189: 
+  190:         modelBuilder.Entity<Customer>(entity =>
+  191:         {
+  192:             entity.ToTable("Customers");
+  193:             entity.HasKey(x => x.Id);
+  194: 
+  195:             entity.Property(x => x.CompanyName)
+  196:                 .HasMaxLength(200)
+  197:                 .IsRequired();
+  198: 
+  199:             entity.Property(x => x.ContactName).HasMaxLength(150);
+  200:             entity.Property(x => x.Email).HasMaxLength(254);
+  201:             entity.Property(x => x.Phone).HasMaxLength(30);
+  202:             entity.Property(x => x.Address).HasMaxLength(500);
+  203: 
+  204:             entity.HasIndex(x => x.UserId).IsUnique();
+  205:         });
+  206: 
+  207:         // ==========================================
+  208:         // SHIPMENTS
+  209:         // ==========================================
+  210: 
+  211:         modelBuilder.Entity<Shipment>(entity =>
+  212:         {
+  213:             entity.ToTable("Shipments");
+  214:             entity.HasKey(x => x.Id);
+  215: 
+  216:             entity.Property(x => x.TrackingNumber)
+  217:                 .HasMaxLength(60)
+  218:                 .IsRequired();
+  219: 
+  220:             entity.Property(x => x.Origin)
+  221:                 .HasMaxLength(250)
+  222:                 .IsRequired();
+  223: 
+  224:             entity.Property(x => x.Destination)
+  225:                 .HasMaxLength(250)
+  226:                 .IsRequired();
+  227: 
+  228:             entity.Property(x => x.Status)
+  229:                 .HasMaxLength(40)
+  230:                 .IsRequired();
+  231: 
+  232:             // Existing booking details
+  233:             entity.Property(x => x.CargoName)

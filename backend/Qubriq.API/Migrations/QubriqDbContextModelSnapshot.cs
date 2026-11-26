@@ -211,6 +211,205 @@ namespace Qubriq.API.Migrations
                     b.ToTable("ExternalLogins", (string)null);
                 });
 
+            modelBuilder.Entity("Qubriq.API.Models.LoadingPlanApproval", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Comments")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<string>("Decision")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<long>("OptimizationRunId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("ReviewedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<long>("ReviewedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OptimizationRunId");
+
+                    b.HasIndex("ReviewedAtUtc");
+
+                    b.HasIndex("ReviewedByUserId");
+
+                    b.ToTable("LoadingPlanApprovals", (string)null);
+                });
+
+            modelBuilder.Entity("Qubriq.API.Models.OptimizationRun", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Algorithm")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("IsFeasible")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<int>("PlacedPackages")
+                        .HasColumnType("int");
+
+                    b.Property<long>("ShipmentId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
+                    b.Property<int>("TotalPackages")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("TotalWeightKg")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<int>("UnplacedPackages")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("UsedWeightKg")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<decimal>("VehicleCapacityKg")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<decimal>("VehicleHeightCm")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<long>("VehicleId")
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal>("VehicleLengthCm")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<decimal>("VehicleWidthCm")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<decimal>("VolumeUtilizationPercent")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("decimal(8,2)");
+
+                    b.Property<string>("Warnings")
+                        .HasColumnType("longtext");
+
+                    b.Property<decimal>("WeightUtilizationPercent")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("decimal(8,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAtUtc");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("ShipmentId");
+
+                    b.HasIndex("VehicleId");
+
+                    b.ToTable("OptimizationRuns", (string)null);
+                });
+
+            modelBuilder.Entity("Qubriq.API.Models.PackagePlacement", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal>("HeightCm")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<bool>("IsFragile")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<decimal>("LengthCm")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<long>("OptimizationRunId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Orientation")
+                        .HasMaxLength(60)
+                        .HasColumnType("varchar(60)");
+
+                    b.Property<string>("PackageDescription")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("varchar(250)");
+
+                    b.Property<string>("PlacementStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<long>("ShipmentPackageId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("UnitNumber")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UnplacedReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<decimal>("WeightKg")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<decimal>("WidthCm")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<decimal?>("X")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<decimal?>("Y")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<decimal?>("Z")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OptimizationRunId");
+
+                    b.HasIndex("ShipmentPackageId");
+
+                    b.HasIndex("OptimizationRunId", "ShipmentPackageId", "UnitNumber")
+                        .IsUnique();
+
+                    b.ToTable("PackagePlacements", (string)null);
+                });
+
             modelBuilder.Entity("Qubriq.API.Models.Permission", b =>
                 {
                     b.Property<long>("Id")
@@ -419,6 +618,64 @@ namespace Qubriq.API.Migrations
                     b.ToTable("ShipmentAssignments", (string)null);
                 });
 
+            modelBuilder.Entity("Qubriq.API.Models.ShipmentPackage", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("varchar(250)");
+
+                    b.Property<decimal>("HeightCm")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<bool>("IsFragile")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<decimal>("LengthCm")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<string>("PackageCode")
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<long>("ShipmentId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("SpecialHandlingRequirements")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<decimal>("WeightKg")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<decimal>("WidthCm")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ShipmentId");
+
+                    b.ToTable("ShipmentPackages", (string)null);
+                });
+
             modelBuilder.Entity("Qubriq.API.Models.ShipmentRecipient", b =>
                 {
                     b.Property<long>("Id")
@@ -518,6 +775,18 @@ namespace Qubriq.API.Migrations
                     b.Property<decimal>("CapacityKg")
                         .HasColumnType("decimal(12,2)");
 
+                    b.Property<decimal?>("CargoHeightCm")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<decimal?>("CargoLengthCm")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<decimal?>("CargoWidthCm")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
                     b.Property<string>("RegistrationNumber")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -601,6 +870,71 @@ namespace Qubriq.API.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Qubriq.API.Models.LoadingPlanApproval", b =>
+                {
+                    b.HasOne("Qubriq.API.Models.OptimizationRun", "OptimizationRun")
+                        .WithMany("Approvals")
+                        .HasForeignKey("OptimizationRunId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Qubriq.API.Models.User", "ReviewedByUser")
+                        .WithMany()
+                        .HasForeignKey("ReviewedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("OptimizationRun");
+
+                    b.Navigation("ReviewedByUser");
+                });
+
+            modelBuilder.Entity("Qubriq.API.Models.OptimizationRun", b =>
+                {
+                    b.HasOne("Qubriq.API.Models.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Qubriq.API.Models.Shipment", "Shipment")
+                        .WithMany("OptimizationRuns")
+                        .HasForeignKey("ShipmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Qubriq.API.Models.Vehicle", "Vehicle")
+                        .WithMany("OptimizationRuns")
+                        .HasForeignKey("VehicleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("Shipment");
+
+                    b.Navigation("Vehicle");
+                });
+
+            modelBuilder.Entity("Qubriq.API.Models.PackagePlacement", b =>
+                {
+                    b.HasOne("Qubriq.API.Models.OptimizationRun", "OptimizationRun")
+                        .WithMany("Placements")
+                        .HasForeignKey("OptimizationRunId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Qubriq.API.Models.ShipmentPackage", "ShipmentPackage")
+                        .WithMany("Placements")
+                        .HasForeignKey("ShipmentPackageId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("OptimizationRun");
+
+                    b.Navigation("ShipmentPackage");
+                });
+
             modelBuilder.Entity("Qubriq.API.Models.RolePermission", b =>
                 {
                     b.HasOne("Qubriq.API.Models.Permission", "Permission")
@@ -658,6 +992,17 @@ namespace Qubriq.API.Migrations
                     b.Navigation("Vehicle");
                 });
 
+            modelBuilder.Entity("Qubriq.API.Models.ShipmentPackage", b =>
+                {
+                    b.HasOne("Qubriq.API.Models.Shipment", "Shipment")
+                        .WithMany("Packages")
+                        .HasForeignKey("ShipmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Shipment");
+                });
+
             modelBuilder.Entity("Qubriq.API.Models.ShipmentRecipient", b =>
                 {
                     b.HasOne("Qubriq.API.Models.Shipment", "Shipment")
@@ -706,6 +1051,13 @@ namespace Qubriq.API.Migrations
                     b.Navigation("Assignments");
                 });
 
+            modelBuilder.Entity("Qubriq.API.Models.OptimizationRun", b =>
+                {
+                    b.Navigation("Approvals");
+
+                    b.Navigation("Placements");
+                });
+
             modelBuilder.Entity("Qubriq.API.Models.Permission", b =>
                 {
                     b.Navigation("RolePermissions");
@@ -721,6 +1073,15 @@ namespace Qubriq.API.Migrations
             modelBuilder.Entity("Qubriq.API.Models.Shipment", b =>
                 {
                     b.Navigation("Assignments");
+
+                    b.Navigation("OptimizationRuns");
+
+                    b.Navigation("Packages");
+                });
+
+            modelBuilder.Entity("Qubriq.API.Models.ShipmentPackage", b =>
+                {
+                    b.Navigation("Placements");
                 });
 
             modelBuilder.Entity("Qubriq.API.Models.User", b =>
@@ -743,6 +1104,8 @@ namespace Qubriq.API.Migrations
             modelBuilder.Entity("Qubriq.API.Models.Vehicle", b =>
                 {
                     b.Navigation("Assignments");
+
+                    b.Navigation("OptimizationRuns");
                 });
 #pragma warning restore 612, 618
         }

@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -44,6 +44,26 @@ public class FleetController : ControllerBase
             .AnyAsync(x => x.IsAllowed && x.Permission.Code == permission);
     }
 
+    // PLANNING COMPATIBILITY
+
+    private static bool FitsInsideVehicle(
+        decimal length,
+        decimal width,
+        decimal height,
+        decimal vehicleLength,
+        decimal vehicleWidth,
+        decimal vehicleHeight)
+    {
+        // A package may be rotated into any of its six axis-aligned orientations.
+        return
+            (length <= vehicleLength && width <= vehicleWidth && height <= vehicleHeight) ||
+            (length <= vehicleLength && height <= vehicleWidth && width <= vehicleHeight) ||
+            (width <= vehicleLength && length <= vehicleWidth && height <= vehicleHeight) ||
+            (width <= vehicleLength && height <= vehicleWidth && length <= vehicleHeight) ||
+            (height <= vehicleLength && length <= vehicleWidth && width <= vehicleHeight) ||
+            (height <= vehicleLength && width <= vehicleWidth && length <= vehicleHeight);
+    }
+
     // VEHICLES
 
     [HttpGet("vehicles")]
@@ -60,6 +80,9 @@ public class FleetController : ControllerBase
                 x.RegistrationNumber,
                 x.VehicleType,
                 x.CapacityKg,
+                x.CargoLengthCm,
+                x.CargoWidthCm,
+                x.CargoHeightCm,
                 x.Status
             }).ToListAsync();
 
@@ -75,8 +98,14 @@ public class FleetController : ControllerBase
             string.IsNullOrWhiteSpace(request.VehicleType) ||
             request.RegistrationNumber.Trim().Length > 30 ||
             request.VehicleType.Trim().Length > 80 ||
-            request.CapacityKg <= 0)
-            return BadRequest(new { message = "Enter a valid registration, vehicle type and positive capacity." });
+            request.CapacityKg <= 0 ||
+            !request.CargoLengthCm.HasValue ||
+            !request.CargoWidthCm.HasValue ||
+            !request.CargoHeightCm.HasValue ||
+            request.CargoLengthCm.Value <= 0 ||
+            request.CargoWidthCm.Value <= 0 ||
+            request.CargoHeightCm.Value <= 0)
+            return BadRequest(new { message = "Enter valid vehicle details, positive payload capacity and positive cargo dimensions in centimetres." });
 
         var registration = request.RegistrationNumber.Trim().ToUpperInvariant();
 
@@ -88,6 +117,9 @@ public class FleetController : ControllerBase
             RegistrationNumber = registration,
             VehicleType = request.VehicleType.Trim(),
             CapacityKg = request.CapacityKg,
+            CargoLengthCm = request.CargoLengthCm,
+            CargoWidthCm = request.CargoWidthCm,
+            CargoHeightCm = request.CargoHeightCm,
             Status = "Available"
         };
 
@@ -96,6 +128,59 @@ public class FleetController : ControllerBase
 
         return CreatedAtAction(nameof(GetVehicles), new { },
             new { vehicle.Id, vehicle.RegistrationNumber, vehicle.Status });
+    }
+
+    [HttpPut("vehicles/{id:long}")]
+    public async Task<IActionResult> UpdateVehicle(long id, VehicleRequest request)
+    {
+        if (!await Allowed("fleet.vehicles.manage")) return Forbid();
+
+        if (string.IsNullOrWhiteSpace(request.RegistrationNumber) ||
+            string.IsNullOrWhiteSpace(request.VehicleType) ||
+            request.RegistrationNumber.Trim().Length > 30 ||
+            request.VehicleType.Trim().Length > 80 ||
+            request.CapacityKg <= 0 ||
+            !request.CargoLengthCm.HasValue ||
+            !request.CargoWidthCm.HasValue ||
+            !request.CargoHeightCm.HasValue ||
+            request.CargoLengthCm.Value <= 0 ||
+            request.CargoWidthCm.Value <= 0 ||
+            request.CargoHeightCm.Value <= 0)
+        {
+            return BadRequest(new { message = "Enter valid vehicle details, positive payload capacity and positive cargo dimensions in centimetres." });
+        }
+
+        var vehicle = await _db.Vehicles.FirstOrDefaultAsync(x => x.Id == id);
+        if (vehicle == null) return NotFound();
+
+        var registration = request.RegistrationNumber.Trim().ToUpperInvariant();
+
+        if (await _db.Vehicles.AnyAsync(x =>
+            x.Id != id && x.RegistrationNumber == registration))
+        {
+            return Conflict(new { message = "Registration number already exists." });
+        }
+
+        vehicle.RegistrationNumber = registration;
+        vehicle.VehicleType = request.VehicleType.Trim();
+        vehicle.CapacityKg = request.CapacityKg;
+        vehicle.CargoLengthCm = request.CargoLengthCm.Value;
+        vehicle.CargoWidthCm = request.CargoWidthCm.Value;
+        vehicle.CargoHeightCm = request.CargoHeightCm.Value;
+
+        await _db.SaveChangesAsync();
+
+        return Ok(new
+        {
+            vehicle.Id,
+            vehicle.RegistrationNumber,
+            vehicle.VehicleType,
+            vehicle.CapacityKg,
+            vehicle.CargoLengthCm,
+            vehicle.CargoWidthCm,
+            vehicle.CargoHeightCm,
+            vehicle.Status
+        });
     }
 
     [HttpPatch("vehicles/{id:long}/status")]
@@ -236,6 +321,7 @@ public class FleetController : ControllerBase
         await using var tx = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
 
         var shipment = await _db.Shipments
+            .Include(x => x.Packages)
             .FirstOrDefaultAsync(x => x.Id == request.ShipmentId);
 
         if (shipment == null) return NotFound(new { message = "Shipment not found." });
@@ -252,9 +338,105 @@ public class FleetController : ControllerBase
         if (driver.Status != "Available" || vehicle.Status != "Available")
             return Conflict(new { message = "Driver and vehicle must both be Available." });
 
-        if (shipment.TotalWeightKg.HasValue &&
-            shipment.TotalWeightKg.Value > vehicle.CapacityKg)
-            return Conflict(new { message = "Shipment weight exceeds vehicle capacity." });
+        if (!vehicle.CargoLengthCm.HasValue ||
+            !vehicle.CargoWidthCm.HasValue ||
+            !vehicle.CargoHeightCm.HasValue ||
+            vehicle.CargoLengthCm.Value <= 0 ||
+            vehicle.CargoWidthCm.Value <= 0 ||
+            vehicle.CargoHeightCm.Value <= 0)
+        {
+            return Conflict(new
+            {
+                message = "Vehicle cargo-compartment dimensions are not configured. Update the vehicle before assigning shipments."
+            });
+        }
+
+        var vehicleLength = vehicle.CargoLengthCm.Value;
+        var vehicleWidth = vehicle.CargoWidthCm.Value;
+        var vehicleHeight = vehicle.CargoHeightCm.Value;
+
+        if (shipment.Packages.Count > 0)
+        {
+            foreach (var package in shipment.Packages)
+            {
+                if (package.Quantity <= 0 ||
+                    package.LengthCm <= 0 ||
+                    package.WidthCm <= 0 ||
+                    package.HeightCm <= 0 ||
+                    package.WeightKg < 0)
+                {
+                    return Conflict(new
+                    {
+                        message = $"Package '{package.Description}' has invalid quantity, dimensions or weight. Correct the package details before assignment."
+                    });
+                }
+
+                if (!FitsInsideVehicle(
+                    package.LengthCm,
+                    package.WidthCm,
+                    package.HeightCm,
+                    vehicleLength,
+                    vehicleWidth,
+                    vehicleHeight))
+                {
+                    return Conflict(new
+                    {
+                        message = $"Package '{package.Description}' cannot fit inside vehicle {vehicle.RegistrationNumber}, even after rotation."
+                    });
+                }
+            }
+        }
+        else
+        {
+            if (!shipment.LengthCm.HasValue ||
+                !shipment.WidthCm.HasValue ||
+                !shipment.HeightCm.HasValue ||
+                shipment.LengthCm.Value <= 0 ||
+                shipment.WidthCm.Value <= 0 ||
+                shipment.HeightCm.Value <= 0)
+            {
+                return Conflict(new
+                {
+                    message = "Shipment dimensions are missing. Add valid cargo length, width and height before assignment."
+                });
+            }
+
+            if (!FitsInsideVehicle(
+                shipment.LengthCm.Value,
+                shipment.WidthCm.Value,
+                shipment.HeightCm.Value,
+                vehicleLength,
+                vehicleWidth,
+                vehicleHeight))
+            {
+                return Conflict(new
+                {
+                    message = "Shipment dimensions exceed the selected vehicle's cargo compartment, even after rotation."
+                });
+            }
+        }
+
+        var packageWeight = shipment.Packages.Count > 0
+            ? shipment.Packages.Sum(x => x.WeightKg * x.Quantity)
+            : (decimal?)null;
+
+        var requiredWeight = shipment.TotalWeightKg ?? packageWeight;
+
+        if (!requiredWeight.HasValue || requiredWeight.Value <= 0)
+        {
+            return Conflict(new
+            {
+                message = "Shipment weight is missing. Add a valid total cargo weight before assignment."
+            });
+        }
+
+        if (requiredWeight.Value > vehicle.CapacityKg)
+        {
+            return Conflict(new
+            {
+                message = $"Shipment weight ({requiredWeight.Value} kg) exceeds vehicle payload capacity ({vehicle.CapacityKg} kg)."
+            });
+        }
 
         var shipmentAssigned = await _db.ShipmentAssignments.AnyAsync(
             x => x.ShipmentId == request.ShipmentId && x.Status == "Active");
@@ -309,6 +491,9 @@ public sealed class VehicleRequest
     public string RegistrationNumber { get; set; } = "";
     public string VehicleType { get; set; } = "";
     public decimal CapacityKg { get; set; }
+    public decimal? CargoLengthCm { get; set; }
+    public decimal? CargoWidthCm { get; set; }
+    public decimal? CargoHeightCm { get; set; }
 }
 
 public sealed class DriverRequest

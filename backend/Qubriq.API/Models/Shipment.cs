@@ -1,4 +1,4 @@
-namespace Qubriq.API.Models;
+﻿namespace Qubriq.API.Models;
 
 public class Shipment
 {
@@ -50,4 +50,11 @@ public class Shipment
 
     public ICollection<ShipmentAssignment> Assignments { get; set; }
         = new List<ShipmentAssignment>();
+
+    public ICollection<ShipmentPackage> Packages { get; set; }
+        = new List<ShipmentPackage>();
+
+    public ICollection<OptimizationRun> OptimizationRuns { get; set; }
+        = new List<OptimizationRun>();
 }
+

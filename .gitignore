@@ -56,3 +56,6 @@ _Backups/
 
 # Manual migration review script; EF migration is canonical
 backend/Qubriq.API/Migrations/RBAC_Migration_Review.sql
+
+# Local test credentials
+*.clixml

@@ -25,6 +25,11 @@ public class QubriqDbContext : DbContext
     public DbSet<DeliveryProof> DeliveryProofs => Set<DeliveryProof>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
+    public DbSet<ShipmentPackage> ShipmentPackages => Set<ShipmentPackage>();
+    public DbSet<OptimizationRun> OptimizationRuns => Set<OptimizationRun>();
+    public DbSet<PackagePlacement> PackagePlacements => Set<PackagePlacement>();
+    public DbSet<LoadingPlanApproval> LoadingPlanApprovals => Set<LoadingPlanApproval>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -286,6 +291,18 @@ public class QubriqDbContext : DbContext
             entity.Property(x => x.CapacityKg)
                 .HasColumnType("decimal(12,2)");
 
+            entity.Property(x => x.CargoLengthCm)
+                .HasPrecision(12, 2)
+                .IsRequired(false);
+
+            entity.Property(x => x.CargoWidthCm)
+                .HasPrecision(12, 2)
+                .IsRequired(false);
+
+            entity.Property(x => x.CargoHeightCm)
+                .HasPrecision(12, 2)
+                .IsRequired(false);
+
             entity.Property(x => x.Status)
                 .HasMaxLength(40)
                 .IsRequired();
@@ -293,6 +310,169 @@ public class QubriqDbContext : DbContext
             entity.HasIndex(x => x.RegistrationNumber).IsUnique();
         });
 
+        // ==========================================
+        // SHIPMENT PACKAGES
+        // ==========================================
+
+        modelBuilder.Entity<ShipmentPackage>(entity =>
+        {
+            entity.ToTable("ShipmentPackages");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Description)
+                .HasMaxLength(250)
+                .IsRequired();
+
+            entity.Property(x => x.PackageCode).HasMaxLength(80);
+            entity.Property(x => x.Category).HasMaxLength(100);
+            entity.Property(x => x.Quantity).IsRequired();
+
+            entity.Property(x => x.LengthCm).HasPrecision(12, 2);
+            entity.Property(x => x.WidthCm).HasPrecision(12, 2);
+            entity.Property(x => x.HeightCm).HasPrecision(12, 2);
+            entity.Property(x => x.WeightKg).HasPrecision(12, 2);
+
+            entity.Property(x => x.SpecialHandlingRequirements)
+                .HasMaxLength(500);
+
+            entity.HasOne(x => x.Shipment)
+                .WithMany(x => x.Packages)
+                .HasForeignKey(x => x.ShipmentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(x => x.ShipmentId);
+        });
+
+        // ==========================================
+        // OPTIMIZATION RUNS
+        // ==========================================
+
+        modelBuilder.Entity<OptimizationRun>(entity =>
+        {
+            entity.ToTable("OptimizationRuns");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Algorithm)
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.Property(x => x.Status)
+                .HasMaxLength(40)
+                .IsRequired();
+
+            entity.Property(x => x.VehicleLengthCm).HasPrecision(12, 2);
+            entity.Property(x => x.VehicleWidthCm).HasPrecision(12, 2);
+            entity.Property(x => x.VehicleHeightCm).HasPrecision(12, 2);
+            entity.Property(x => x.VehicleCapacityKg).HasPrecision(12, 2);
+
+            entity.Property(x => x.TotalWeightKg).HasPrecision(12, 2);
+            entity.Property(x => x.UsedWeightKg).HasPrecision(12, 2);
+            entity.Property(x => x.WeightUtilizationPercent).HasPrecision(8, 2);
+            entity.Property(x => x.VolumeUtilizationPercent).HasPrecision(8, 2);
+
+            entity.Property(x => x.Warnings)
+                .HasColumnType("longtext");
+
+            entity.HasOne(x => x.Shipment)
+                .WithMany(x => x.OptimizationRuns)
+                .HasForeignKey(x => x.ShipmentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.Vehicle)
+                .WithMany(x => x.OptimizationRuns)
+                .HasForeignKey(x => x.VehicleId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(x => x.ShipmentId);
+            entity.HasIndex(x => x.VehicleId);
+            entity.HasIndex(x => x.CreatedByUserId);
+            entity.HasIndex(x => x.CreatedAtUtc);
+        });
+
+        // ==========================================
+        // PACKAGE PLACEMENTS
+        // ==========================================
+
+        modelBuilder.Entity<PackagePlacement>(entity =>
+        {
+            entity.ToTable("PackagePlacements");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.PackageDescription)
+                .HasMaxLength(250)
+                .IsRequired();
+
+            entity.Property(x => x.LengthCm).HasPrecision(12, 2);
+            entity.Property(x => x.WidthCm).HasPrecision(12, 2);
+            entity.Property(x => x.HeightCm).HasPrecision(12, 2);
+            entity.Property(x => x.WeightKg).HasPrecision(12, 2);
+
+            entity.Property(x => x.PlacementStatus)
+                .HasMaxLength(20)
+                .IsRequired();
+
+            entity.Property(x => x.X).HasPrecision(12, 2);
+            entity.Property(x => x.Y).HasPrecision(12, 2);
+            entity.Property(x => x.Z).HasPrecision(12, 2);
+
+            entity.Property(x => x.Orientation).HasMaxLength(60);
+            entity.Property(x => x.UnplacedReason).HasMaxLength(500);
+
+            entity.HasOne(x => x.OptimizationRun)
+                .WithMany(x => x.Placements)
+                .HasForeignKey(x => x.OptimizationRunId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.ShipmentPackage)
+                .WithMany(x => x.Placements)
+                .HasForeignKey(x => x.ShipmentPackageId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(x => x.OptimizationRunId);
+            entity.HasIndex(x => x.ShipmentPackageId);
+
+            entity.HasIndex(x => new
+            {
+                x.OptimizationRunId,
+                x.ShipmentPackageId,
+                x.UnitNumber
+            }).IsUnique();
+        });
+
+        // ==========================================
+        // LOADING PLAN APPROVALS
+        // ==========================================
+
+        modelBuilder.Entity<LoadingPlanApproval>(entity =>
+        {
+            entity.ToTable("LoadingPlanApprovals");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Decision)
+                .HasMaxLength(20)
+                .IsRequired();
+
+            entity.Property(x => x.Comments).HasMaxLength(1000);
+
+            entity.HasOne(x => x.OptimizationRun)
+                .WithMany(x => x.Approvals)
+                .HasForeignKey(x => x.OptimizationRunId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.ReviewedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.ReviewedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(x => x.OptimizationRunId);
+            entity.HasIndex(x => x.ReviewedByUserId);
+            entity.HasIndex(x => x.ReviewedAtUtc);
+        });
         // ==========================================
         // DRIVERS
         // ==========================================
@@ -450,3 +630,4 @@ public class QubriqDbContext : DbContext
         });
     }
 }
+

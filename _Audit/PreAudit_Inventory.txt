@@ -1,0 +1,670 @@
+﻿**********************
+Windows PowerShell transcript start
+Start time: 20261124172452
+Username: SUBHODHRAJ\subho
+RunAs User: SUBHODHRAJ\subho
+Configuration Name: 
+Machine: SUBHODHRAJ (Microsoft Windows NT 10.0.26200.0)
+Host Application: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe
+Process ID: 17384
+PSVersion: 5.1.26100.9818
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.9818
+BuildVersion: 10.0.26100.9818
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+Transcript started, output file is S:\Project_Qubriq\_Audit\PreAudit_Inventory.txt
+
+========== 1. GIT STATUS ==========
+## subhodhraj...origin/subhodhraj
+?? Qubriq_PreAudit.ps1
+?? _Audit/
+42dfdb9 (HEAD -> subhodhraj, origin/subhodhraj) Add shipment cargo tracking and delivery operations
+e258253 Complete hybrid RBAC and recipient access
+787271b (origin/main, origin/HEAD) Merge pull request #1 from SUBHODHRAJ/subhodhraj
+b3a95cd Complete Stage 2 booking frontend and automated tests
+7efb41a Implement Stage 2 booking API and customer management
+
+========== 2. BACKEND CONTROLLERS ==========
+
+--- AdminBootstrapController.cs ---
+
+backend\Qubriq.API\Controllers\AdminBootstrapController.cs:15:[Route("api/auth/bootstrap")]
+backend\Qubriq.API\Controllers\AdminBootstrapController.cs:33:    [HttpPost("admin")]
+backend\Qubriq.API\Controllers\AdminBootstrapController.cs:34:    public async Task<IActionResult> CreateFirstAdmin(
+
+--- AdminCustomersController.cs ---
+backend\Qubriq.API\Controllers\AdminCustomersController.cs:14:[Route("api/admin/customers")]
+backend\Qubriq.API\Controllers\AdminCustomersController.cs:15:[Authorize(Policy = "AdminCustomerProvision")]
+backend\Qubriq.API\Controllers\AdminCustomersController.cs:42:    [HttpPost("{customerId:long}/account")]
+backend\Qubriq.API\Controllers\AdminCustomersController.cs:43:    public async Task<IActionResult>
+CreateCustomerAccount(
+
+--- AdminRecipientsController.cs ---
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:13:[Route("api/admin/recipients")]
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:14:[Authorize(Roles = "Admin")]
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:57:    [HttpPost]
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:58:    public async Task<IActionResult> CreateRecipient(
+
+--- AdminShipmentAssignmentsController.cs ---
+backend\Qubriq.API\Controllers\AdminShipmentAssignmentsController.cs:12:[Route("api/admin/shipment-assignments")]
+backend\Qubriq.API\Controllers\AdminShipmentAssignmentsController.cs:13:[Authorize(Roles =
+"Admin,OperationsDispatcher")]
+backend\Qubriq.API\Controllers\AdminShipmentAssignmentsController.cs:52:    [HttpPost("driver")]
+backend\Qubriq.API\Controllers\AdminShipmentAssignmentsController.cs:53:    public async Task<IActionResult>
+AssignDriver(
+backend\Qubriq.API\Controllers\AdminShipmentAssignmentsController.cs:146:    [HttpPost("recipient")]
+backend\Qubriq.API\Controllers\AdminShipmentAssignmentsController.cs:147:    public async Task<IActionResult>
+AssignFinalRecipient(
+
+--- AuthController.cs ---
+backend\Qubriq.API\Controllers\AuthController.cs:9:[Route("api/auth")]
+backend\Qubriq.API\Controllers\AuthController.cs:20:    [HttpPost("login")]
+backend\Qubriq.API\Controllers\AuthController.cs:21:    public async Task<IActionResult> Login(
+
+--- BookingsController.cs ---
+backend\Qubriq.API\Controllers\BookingsController.cs:12:[Authorize]
+backend\Qubriq.API\Controllers\BookingsController.cs:13:[Route("api/bookings")]
+backend\Qubriq.API\Controllers\BookingsController.cs:56:    [HttpGet]
+backend\Qubriq.API\Controllers\BookingsController.cs:57:    [Authorize(Policy = "BookingsRead")]
+backend\Qubriq.API\Controllers\BookingsController.cs:58:    public async Task<IActionResult> GetBookings(
+backend\Qubriq.API\Controllers\BookingsController.cs:125:    [HttpGet("customers")]
+backend\Qubriq.API\Controllers\BookingsController.cs:126:    [Authorize(Policy = "BookingsReadAll")]
+backend\Qubriq.API\Controllers\BookingsController.cs:127:    public async Task<IActionResult> GetCustomers()
+backend\Qubriq.API\Controllers\BookingsController.cs:148:    [HttpPost]
+backend\Qubriq.API\Controllers\BookingsController.cs:149:    [Authorize(Policy = "BookingsCreate")]
+backend\Qubriq.API\Controllers\BookingsController.cs:150:    public async Task<IActionResult> CreateBooking(
+
+--- CustomersController.cs ---
+backend\Qubriq.API\Controllers\CustomersController.cs:11:[Authorize(Roles = "Admin")]
+backend\Qubriq.API\Controllers\CustomersController.cs:12:[Route("api/customers")]
+backend\Qubriq.API\Controllers\CustomersController.cs:22:    [HttpGet]
+backend\Qubriq.API\Controllers\CustomersController.cs:23:    public async Task<IActionResult> GetCustomers(
+backend\Qubriq.API\Controllers\CustomersController.cs:60:    [HttpGet("{id:long}")]
+backend\Qubriq.API\Controllers\CustomersController.cs:61:    public async Task<IActionResult> GetCustomer(long id)
+backend\Qubriq.API\Controllers\CustomersController.cs:85:    [HttpPost]
+backend\Qubriq.API\Controllers\CustomersController.cs:86:    public async Task<IActionResult> CreateCustomer(
+backend\Qubriq.API\Controllers\CustomersController.cs:125:    [HttpPut("{id:long}")]
+backend\Qubriq.API\Controllers\CustomersController.cs:126:    public async Task<IActionResult> UpdateCustomer(
+backend\Qubriq.API\Controllers\CustomersController.cs:162:    [HttpPatch("{id:long}/status")]
+backend\Qubriq.API\Controllers\CustomersController.cs:163:    public async Task<IActionResult> UpdateCustomerStatus(
+
+--- DeliveryOperationsController.cs ---
+backend\Qubriq.API\Controllers\DeliveryOperationsController.cs:10:[Route("api/operations/deliveries")]
+backend\Qubriq.API\Controllers\DeliveryOperationsController.cs:11:[Authorize(Roles = "Admin,OperationsDispatcher")]
+backend\Qubriq.API\Controllers\DeliveryOperationsController.cs:49:    [HttpGet]
+backend\Qubriq.API\Controllers\DeliveryOperationsController.cs:50:    public async Task<IActionResult> GetDeliveries(
+
+--- DispatcherController.cs ---
+backend\Qubriq.API\Controllers\DispatcherController.cs:10:[Route("api/dispatcher")]
+backend\Qubriq.API\Controllers\DispatcherController.cs:11:[Authorize(Roles = "Admin,OperationsDispatcher")]
+backend\Qubriq.API\Controllers\DispatcherController.cs:52:    [HttpGet("dashboard")]
+backend\Qubriq.API\Controllers\DispatcherController.cs:53:    public async Task<IActionResult> GetDashboard()
+backend\Qubriq.API\Controllers\DispatcherController.cs:112:    [HttpGet("shipments")]
+backend\Qubriq.API\Controllers\DispatcherController.cs:113:    public async Task<IActionResult> GetShipments(
+backend\Qubriq.API\Controllers\DispatcherController.cs:167:    [HttpPatch("bookings/{id:long}/status")]
+backend\Qubriq.API\Controllers\DispatcherController.cs:168:    public async Task<IActionResult> UpdateBookingStatus(
+backend\Qubriq.API\Controllers\DispatcherController.cs:225:    [HttpPatch("shipments/{id:long}/status")]
+backend\Qubriq.API\Controllers\DispatcherController.cs:226:    public async Task<IActionResult> UpdateShipmentStatus(
+
+--- FleetController.cs ---
+backend\Qubriq.API\Controllers\FleetController.cs:12:[Route("api/fleet")]
+backend\Qubriq.API\Controllers\FleetController.cs:13:[Authorize(Roles = "Admin,OperationsDispatcher")]
+backend\Qubriq.API\Controllers\FleetController.cs:49:    [HttpGet("vehicles")]
+backend\Qubriq.API\Controllers\FleetController.cs:50:    public async Task<IActionResult> GetVehicles()
+backend\Qubriq.API\Controllers\FleetController.cs:69:    [HttpPost("vehicles")]
+backend\Qubriq.API\Controllers\FleetController.cs:70:    public async Task<IActionResult> CreateVehicle(VehicleRequest
+request)
+backend\Qubriq.API\Controllers\FleetController.cs:101:    [HttpPatch("vehicles/{id:long}/status")]
+backend\Qubriq.API\Controllers\FleetController.cs:102:    public async Task<IActionResult> UpdateVehicleStatus(long
+id, StatusRequest request)
+backend\Qubriq.API\Controllers\FleetController.cs:125:    [HttpGet("drivers")]
+backend\Qubriq.API\Controllers\FleetController.cs:126:    public async Task<IActionResult> GetDrivers()
+backend\Qubriq.API\Controllers\FleetController.cs:146:    [HttpPost("drivers")]
+backend\Qubriq.API\Controllers\FleetController.cs:147:    public async Task<IActionResult> CreateDriver(DriverRequest
+request)
+backend\Qubriq.API\Controllers\FleetController.cs:178:    [HttpPatch("drivers/{id:long}/status")]
+backend\Qubriq.API\Controllers\FleetController.cs:179:    public async Task<IActionResult> UpdateDriverStatus(long id,
+StatusRequest request)
+backend\Qubriq.API\Controllers\FleetController.cs:202:    [HttpGet("assignments")]
+backend\Qubriq.API\Controllers\FleetController.cs:203:    public async Task<IActionResult> GetAssignments()
+backend\Qubriq.API\Controllers\FleetController.cs:228:    [HttpPost("assignments")]
+backend\Qubriq.API\Controllers\FleetController.cs:229:    public async Task<IActionResult> Assign(AssignmentRequest
+request)
+
+--- HealthController.cs ---
+backend\Qubriq.API\Controllers\HealthController.cs:6:[Route("api/[controller]")]
+backend\Qubriq.API\Controllers\HealthController.cs:9:    [HttpGet]
+backend\Qubriq.API\Controllers\HealthController.cs:10:    public IActionResult Get()
+
+--- RecipientShipmentsController.cs ---
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:12:[Authorize(Roles = "ShipmentRecipient")]
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:13:[Route("api/recipient/shipments")]
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:88:    [HttpGet]
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:89:    public async Task<IActionResult> GetMine()
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:126:    [HttpGet("{id:long}")]
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:127:    public async Task<IActionResult> GetOne(long id)
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:175:    [HttpPatch("{id:long}/status")]
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:176:    public async Task<IActionResult> UpdateStatus(
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:234:    [HttpPost("{id:long}/proof")]
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:235:    public async Task<IActionResult> SubmitProof(
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:293:    [HttpGet("{id:long}/tracking")]
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:294:    public async Task<IActionResult>
+GetTracking(long id)
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:341:    [HttpPost("{id:long}/confirm-receipt")]
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:342:    public async Task<IActionResult>
+ConfirmReceipt(long id)
+
+--- ShipmentOperationsController.cs ---
+backend\Qubriq.API\Controllers\ShipmentOperationsController.cs:10:[Route("api/operations/shipments")]
+backend\Qubriq.API\Controllers\ShipmentOperationsController.cs:11:[Authorize(Roles = "Admin,OperationsDispatcher")]
+backend\Qubriq.API\Controllers\ShipmentOperationsController.cs:46:    [HttpGet("{id:long}")]
+backend\Qubriq.API\Controllers\ShipmentOperationsController.cs:47:    public async Task<IActionResult>
+GetShipment(long id)
+backend\Qubriq.API\Controllers\ShipmentOperationsController.cs:87:    [HttpGet("{id:long}/tracking")]
+backend\Qubriq.API\Controllers\ShipmentOperationsController.cs:88:    public async Task<IActionResult>
+GetTracking(long id)
+backend\Qubriq.API\Controllers\ShipmentOperationsController.cs:136:    [HttpPut("{id:long}/cargo")]
+backend\Qubriq.API\Controllers\ShipmentOperationsController.cs:137:    public async Task<IActionResult> UpdateCargo(
+
+========== 3. AUTH AND PROVISIONING SOURCE ==========
+
+--- \backend\Qubriq.API\Controllers\AdminCustomersController.cs ---
+backend\Qubriq.API\Controllers\AdminCustomersController.cs:14:[Route("api/admin/customers")]
+backend\Qubriq.API\Controllers\AdminCustomersController.cs:16:public class AdminCustomersController : ControllerBase
+backend\Qubriq.API\Controllers\AdminCustomersController.cs:19:    private readonly PasswordHasher<User>
+_passwordHasher;
+backend\Qubriq.API\Controllers\AdminCustomersController.cs:24:        _passwordHasher = new PasswordHasher<User>();
+backend\Qubriq.API\Controllers\AdminCustomersController.cs:42:    [HttpPost("{customerId:long}/account")]
+backend\Qubriq.API\Controllers\AdminCustomersController.cs:59:            string.IsNullOrWhiteSpace(request.Password))
+backend\Qubriq.API\Controllers\AdminCustomersController.cs:63:                message = "Full name, email and password
+are required."
+backend\Qubriq.API\Controllers\AdminCustomersController.cs:67:        if (request.Password.Length < 12 ||
+backend\Qubriq.API\Controllers\AdminCustomersController.cs:68:            request.Password.Length > 128)
+backend\Qubriq.API\Controllers\AdminCustomersController.cs:72:                message = "Password must contain between
+12 and 128 characters."
+backend\Qubriq.API\Controllers\AdminCustomersController.cs:91:        if (!customer.IsActive)
+backend\Qubriq.API\Controllers\AdminCustomersController.cs:119:        var customerRole = await _db.Roles
+backend\Qubriq.API\Controllers\AdminCustomersController.cs:122:        if (customerRole == null)
+backend\Qubriq.API\Controllers\AdminCustomersController.cs:126:                message = "BookingCustomer role is
+missing. Check RBAC seed data."
+backend\Qubriq.API\Controllers\AdminCustomersController.cs:134:            IsActive = true,
+backend\Qubriq.API\Controllers\AdminCustomersController.cs:136:            RecipientType = null,
+backend\Qubriq.API\Controllers\AdminCustomersController.cs:141:        user.PasswordHash =
+_passwordHasher.HashPassword(
+backend\Qubriq.API\Controllers\AdminCustomersController.cs:143:            request.Password);
+backend\Qubriq.API\Controllers\AdminCustomersController.cs:149:        var userRole = new UserRole
+backend\Qubriq.API\Controllers\AdminCustomersController.cs:152:            RoleId = customerRole.Id,
+backend\Qubriq.API\Controllers\AdminCustomersController.cs:156:        _db.UserRoles.Add(userRole);
+backend\Qubriq.API\Controllers\AdminCustomersController.cs:191:                role = customerRole.Name,
+backend\Qubriq.API\Controllers\AdminCustomersController.cs:192:                user.IsActive,
+
+--- \backend\Qubriq.API\Controllers\AdminRecipientsController.cs ---
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:13:[Route("api/admin/recipients")]
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:14:[Authorize(Roles = "Admin")]
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:15:public class AdminRecipientsController : ControllerBase
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:18:    private readonly PasswordHasher<User> _hasher =
+new();
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:38:        return await _db.UserRoles
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:40:            .Join(_db.RolePermissions,
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:41:                x => x.RoleId,
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:42:                x => x.RoleId,
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:48:    public sealed class CreateRecipientRequest
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:50:        public string FullName { get; set; } = "";
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:51:        public string Email { get; set; } = "";
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:52:        public string Password { get; set; } = "";
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:53:        public string RecipientType { get; set; } = "";
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:54:        public long? DriverId { get; set; }
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:57:    [HttpPost]
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:62:            !await HasPermission("users.assign_role"))
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:70:        var password = request.Password;
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:71:        var type = request.RecipientType?.Trim() ?? "";
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:96:        if (string.IsNullOrEmpty(password) ||
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:97:            password.Length < 12 ||
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:98:            password.Length > 128)
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:100:            return BadRequest(new { message =
+"Password must be 12-128 characters." });
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:132:        var role = await _db.Roles
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:135:        if (role == null)
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:136:            return StatusCode(500, new { message =
+"ShipmentRecipient role is missing." });
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:142:            RecipientType = type,
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:143:            IsActive = true,
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:149:        user.PasswordHash = _hasher.HashPassword(user,
+request.Password);
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:154:        _db.UserRoles.Add(new UserRole
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:157:            RoleId = role.Id,
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:170:            Details = $"RecipientType={type};
+DriverId={driver?.Id}",
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:182:            user.RecipientType,
+backend\Qubriq.API\Controllers\AdminRecipientsController.cs:183:            user.IsActive,
+
+--- \backend\Qubriq.API\Controllers\AdminShipmentAssignmentsController.cs ---
+backend\Qubriq.API\Controllers\AdminShipmentAssignmentsController.cs:12:[Route("api/admin/shipment-assignments")]
+backend\Qubriq.API\Controllers\AdminShipmentAssignmentsController.cs:13:[Authorize(Roles =
+"Admin,OperationsDispatcher")]
+backend\Qubriq.API\Controllers\AdminShipmentAssignmentsController.cs:14:public class
+AdminShipmentAssignmentsController : ControllerBase
+backend\Qubriq.API\Controllers\AdminShipmentAssignmentsController.cs:36:        return await _db.UserRoles
+backend\Qubriq.API\Controllers\AdminShipmentAssignmentsController.cs:38:            .Join(_db.RolePermissions,
+backend\Qubriq.API\Controllers\AdminShipmentAssignmentsController.cs:39:                x => x.RoleId,
+backend\Qubriq.API\Controllers\AdminShipmentAssignmentsController.cs:40:                x => x.RoleId,
+backend\Qubriq.API\Controllers\AdminShipmentAssignmentsController.cs:45:    public sealed class DriverAssignmentRequest
+backend\Qubriq.API\Controllers\AdminShipmentAssignmentsController.cs:47:        public long ShipmentId { get; set; }
+backend\Qubriq.API\Controllers\AdminShipmentAssignmentsController.cs:48:        public long DriverId { get; set; }
+backend\Qubriq.API\Controllers\AdminShipmentAssignmentsController.cs:49:        public long VehicleId { get; set; }
+backend\Qubriq.API\Controllers\AdminShipmentAssignmentsController.cs:52:    [HttpPost("driver")]
+backend\Qubriq.API\Controllers\AdminShipmentAssignmentsController.cs:140:    public sealed class FinalRecipientRequest
+backend\Qubriq.API\Controllers\AdminShipmentAssignmentsController.cs:142:        public long ShipmentId { get; set; }
+backend\Qubriq.API\Controllers\AdminShipmentAssignmentsController.cs:143:        public long RecipientUserId { get;
+set; }
+backend\Qubriq.API\Controllers\AdminShipmentAssignmentsController.cs:146:    [HttpPost("recipient")]
+backend\Qubriq.API\Controllers\AdminShipmentAssignmentsController.cs:159:                x.IsActive &&
+backend\Qubriq.API\Controllers\AdminShipmentAssignmentsController.cs:160:                x.RecipientType ==
+"FinalRecipient");
+
+--- \backend\Qubriq.API\Controllers\AuthController.cs ---
+backend\Qubriq.API\Controllers\AuthController.cs:9:[Route("api/auth")]
+backend\Qubriq.API\Controllers\AuthController.cs:10:public class AuthController : ControllerBase
+backend\Qubriq.API\Controllers\AuthController.cs:20:    [HttpPost("login")]
+backend\Qubriq.API\Controllers\AuthController.cs:30:                message = "Invalid email or password, or the
+account is inactive."
+
+--- \backend\Qubriq.API\Controllers\RecipientShipmentsController.cs ---
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:12:[Authorize(Roles = "ShipmentRecipient")]
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:13:[Route("api/recipient/shipments")]
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:14:public class RecipientShipmentsController :
+ControllerBase
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:37:            .FirstOrDefaultAsync(x => x.Id ==
+id.Value && x.IsActive);
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:42:        return await _db.UserRoles
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:44:            .Join(_db.RolePermissions,
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:45:                x => x.RoleId,
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:46:                x => x.RoleId,
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:53:        if (user.RecipientType ==
+"DeliveryPersonnel")
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:62:        if (user.RecipientType == "FinalRecipient")
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:88:    [HttpGet]
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:94:        var permission = user.RecipientType ==
+"DeliveryPersonnel"
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:96:            : user.RecipientType == "FinalRecipient"
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:126:    [HttpGet("{id:long}")]
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:132:        var permission = user.RecipientType ==
+"DeliveryPersonnel"
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:134:            : user.RecipientType == "FinalRecipient"
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:170:    public sealed class StatusRequest
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:172:        public string Status { get; set; } = "";
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:175:    [HttpPatch("{id:long}/status")]
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:181:        if (user == null || user.RecipientType !=
+"DeliveryPersonnel")
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:227:    public sealed class ProofRequest
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:229:        public string ProofType { get; set; } = "";
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:230:        public string? FileReference { get; set; }
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:231:        public string? Remarks { get; set; }
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:234:    [HttpPost("{id:long}/proof")]
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:240:        if (user == null || user.RecipientType !=
+"DeliveryPersonnel")
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:293:    [HttpGet("{id:long}/tracking")]
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:299:        var permission = user.RecipientType ==
+"DeliveryPersonnel"
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:301:            : user.RecipientType == "FinalRecipient"
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:341:    [HttpPost("{id:long}/confirm-receipt")]
+backend\Qubriq.API\Controllers\RecipientShipmentsController.cs:345:        if (user == null || user.RecipientType !=
+"FinalRecipient")
+
+--- \backend\Qubriq.API\DTOs\CreateBookingRequest.cs ---
+backend\Qubriq.API\DTOs\CreateBookingRequest.cs:5:public class CreateBookingRequest
+backend\Qubriq.API\DTOs\CreateBookingRequest.cs:8:    public long? CustomerId { get; set; }
+backend\Qubriq.API\DTOs\CreateBookingRequest.cs:12:    public string Origin { get; set; } = string.Empty;
+backend\Qubriq.API\DTOs\CreateBookingRequest.cs:16:    public string Destination { get; set; } = string.Empty;
+backend\Qubriq.API\DTOs\CreateBookingRequest.cs:20:    public string CargoName { get; set; } = string.Empty;
+backend\Qubriq.API\DTOs\CreateBookingRequest.cs:23:    public string? CargoCategory { get; set; }
+backend\Qubriq.API\DTOs\CreateBookingRequest.cs:26:    public int PackageCount { get; set; }
+backend\Qubriq.API\DTOs\CreateBookingRequest.cs:29:    public decimal TotalWeightKg { get; set; }
+backend\Qubriq.API\DTOs\CreateBookingRequest.cs:32:    public decimal? LengthCm { get; set; }
+backend\Qubriq.API\DTOs\CreateBookingRequest.cs:35:    public decimal? WidthCm { get; set; }
+backend\Qubriq.API\DTOs\CreateBookingRequest.cs:38:    public decimal? HeightCm { get; set; }
+backend\Qubriq.API\DTOs\CreateBookingRequest.cs:40:    public bool IsFragile { get; set; }
+backend\Qubriq.API\DTOs\CreateBookingRequest.cs:43:    public string? SpecialHandlingRequirements { get; set; }
+backend\Qubriq.API\DTOs\CreateBookingRequest.cs:47:    public string Priority { get; set; } = "Normal";
+backend\Qubriq.API\DTOs\CreateBookingRequest.cs:49:    public DateTime PickupDateUtc { get; set; }
+backend\Qubriq.API\DTOs\CreateBookingRequest.cs:51:    public DateTime? ExpectedDeliveryUtc { get; set; }
+backend\Qubriq.API\DTOs\CreateBookingRequest.cs:54:    public string? DeliveryTimeWindow { get; set; }
+backend\Qubriq.API\DTOs\CreateBookingRequest.cs:57:    public string? AdditionalInstructions { get; set; }
+backend\Qubriq.API\DTOs\CreateBookingRequest.cs:60:    public string Status { get; set; } = "Confirmed";
+
+--- \backend\Qubriq.API\DTOs\CreateCustomerRequest.cs ---
+backend\Qubriq.API\DTOs\CreateCustomerRequest.cs:5:public class CreateCustomerRequest
+backend\Qubriq.API\DTOs\CreateCustomerRequest.cs:9:    public string CompanyName { get; set; } = string.Empty;
+backend\Qubriq.API\DTOs\CreateCustomerRequest.cs:12:    public string? ContactName { get; set; }
+backend\Qubriq.API\DTOs\CreateCustomerRequest.cs:16:    public string? Email { get; set; }
+backend\Qubriq.API\DTOs\CreateCustomerRequest.cs:20:    public string? Phone { get; set; }
+backend\Qubriq.API\DTOs\CreateCustomerRequest.cs:23:    public string? Address { get; set; }
+
+--- \backend\Qubriq.API\DTOs\UpdateCustomerRequest.cs ---
+backend\Qubriq.API\DTOs\UpdateCustomerRequest.cs:5:public class UpdateCustomerRequest
+backend\Qubriq.API\DTOs\UpdateCustomerRequest.cs:9:    public string CompanyName { get; set; } = string.Empty;
+backend\Qubriq.API\DTOs\UpdateCustomerRequest.cs:12:    public string? ContactName { get; set; }
+backend\Qubriq.API\DTOs\UpdateCustomerRequest.cs:16:    public string? Email { get; set; }
+backend\Qubriq.API\DTOs\UpdateCustomerRequest.cs:20:    public string? Phone { get; set; }
+backend\Qubriq.API\DTOs\UpdateCustomerRequest.cs:23:    public string? Address { get; set; }
+
+--- \backend\Qubriq.API\DTOs\UpdateCustomerStatusRequest.cs ---
+backend\Qubriq.API\DTOs\UpdateCustomerStatusRequest.cs:3:public class UpdateCustomerStatusRequest
+backend\Qubriq.API\DTOs\UpdateCustomerStatusRequest.cs:5:    public bool IsActive { get; set; }
+
+--- \backend\Qubriq.API\DTOs\Admin\CreateCustomerAccountRequest.cs ---
+backend\Qubriq.API\DTOs\Admin\CreateCustomerAccountRequest.cs:5:public class CreateCustomerAccountRequest
+backend\Qubriq.API\DTOs\Admin\CreateCustomerAccountRequest.cs:9:    public string FullName { get; set; } =
+string.Empty;
+backend\Qubriq.API\DTOs\Admin\CreateCustomerAccountRequest.cs:14:    public string Email { get; set; } = string.Empty;
+backend\Qubriq.API\DTOs\Admin\CreateCustomerAccountRequest.cs:18:    public string Password { get; set; } =
+string.Empty;
+
+--- \backend\Qubriq.API\DTOs\Auth\AuthResponse.cs ---
+backend\Qubriq.API\DTOs\Auth\AuthResponse.cs:3:public class AuthResponse
+backend\Qubriq.API\DTOs\Auth\AuthResponse.cs:5:    public string AccessToken { get; set; } = string.Empty;
+backend\Qubriq.API\DTOs\Auth\AuthResponse.cs:7:    public string TokenType { get; set; } = "Bearer";
+backend\Qubriq.API\DTOs\Auth\AuthResponse.cs:9:    public DateTime ExpiresAtUtc { get; set; }
+backend\Qubriq.API\DTOs\Auth\AuthResponse.cs:11:    public AuthenticatedUserDto User { get; set; } = new();
+backend\Qubriq.API\DTOs\Auth\AuthResponse.cs:14:public class AuthenticatedUserDto
+backend\Qubriq.API\DTOs\Auth\AuthResponse.cs:16:    public long Id { get; set; }
+backend\Qubriq.API\DTOs\Auth\AuthResponse.cs:18:    public string FullName { get; set; } = string.Empty;
+backend\Qubriq.API\DTOs\Auth\AuthResponse.cs:20:    public string Email { get; set; } = string.Empty;
+backend\Qubriq.API\DTOs\Auth\AuthResponse.cs:22:    public List<string> Roles { get; set; } = new();
+backend\Qubriq.API\DTOs\Auth\AuthResponse.cs:24:    public string? RecipientType { get; set; }
+
+--- \backend\Qubriq.API\DTOs\Auth\BootstrapAdminRequest.cs ---
+backend\Qubriq.API\DTOs\Auth\BootstrapAdminRequest.cs:5:public class BootstrapAdminRequest
+backend\Qubriq.API\DTOs\Auth\BootstrapAdminRequest.cs:9:    public string FullName { get; set; } = string.Empty;
+backend\Qubriq.API\DTOs\Auth\BootstrapAdminRequest.cs:14:    public string Email { get; set; } = string.Empty;
+backend\Qubriq.API\DTOs\Auth\BootstrapAdminRequest.cs:19:    public string Password { get; set; } = string.Empty;
+
+--- \backend\Qubriq.API\DTOs\Auth\LoginRequest.cs ---
+backend\Qubriq.API\DTOs\Auth\LoginRequest.cs:5:public class LoginRequest
+backend\Qubriq.API\DTOs\Auth\LoginRequest.cs:10:    public string Email { get; set; } = string.Empty;
+backend\Qubriq.API\DTOs\Auth\LoginRequest.cs:15:    public string Password { get; set; } = string.Empty;
+
+--- \backend\Qubriq.API\Services\AuthService.cs ---
+backend\Qubriq.API\Services\AuthService.cs:13:public class AuthService
+backend\Qubriq.API\Services\AuthService.cs:17:    private readonly PasswordHasher<User> _passwordHasher;
+backend\Qubriq.API\Services\AuthService.cs:25:        _passwordHasher = new PasswordHasher<User>();
+backend\Qubriq.API\Services\AuthService.cs:33:            .Include(x => x.UserRoles)
+backend\Qubriq.API\Services\AuthService.cs:34:                .ThenInclude(x => x.Role)
+backend\Qubriq.API\Services\AuthService.cs:37:        if (user == null || !user.IsActive)
+backend\Qubriq.API\Services\AuthService.cs:42:        if (string.IsNullOrWhiteSpace(user.PasswordHash))
+backend\Qubriq.API\Services\AuthService.cs:47:        var verificationResult = _passwordHasher.VerifyHashedPassword(
+backend\Qubriq.API\Services\AuthService.cs:49:            user.PasswordHash,
+backend\Qubriq.API\Services\AuthService.cs:50:            request.Password);
+backend\Qubriq.API\Services\AuthService.cs:52:        if (verificationResult == PasswordVerificationResult.Failed)
+backend\Qubriq.API\Services\AuthService.cs:57:        var roles = user.UserRoles
+backend\Qubriq.API\Services\AuthService.cs:58:            .Where(x => x.Role != null)
+backend\Qubriq.API\Services\AuthService.cs:59:            .Select(x => x.Role.Name)
+backend\Qubriq.API\Services\AuthService.cs:69:        return CreateTokenResponse(user, roles);
+backend\Qubriq.API\Services\AuthService.cs:74:        List<string> roles)
+backend\Qubriq.API\Services\AuthService.cs:124:        foreach (var role in roles)
+backend\Qubriq.API\Services\AuthService.cs:126:            claims.Add(new Claim(ClaimTypes.Role, role));
+backend\Qubriq.API\Services\AuthService.cs:129:        if (roles.Contains("ShipmentRecipient") &&
+backend\Qubriq.API\Services\AuthService.cs:130:            !string.IsNullOrWhiteSpace(user.RecipientType))
+backend\Qubriq.API\Services\AuthService.cs:132:            claims.Add(new Claim("recipient_type", user.RecipientType));
+backend\Qubriq.API\Services\AuthService.cs:160:                Roles = roles,
+backend\Qubriq.API\Services\AuthService.cs:161:                RecipientType = roles.Contains("ShipmentRecipient")
+backend\Qubriq.API\Services\AuthService.cs:162:                    ? user.RecipientType
+
+========== 4. FRONTEND ROUTES AND SERVICES ==========
+
+--- \frontend\src\layouts\DashboardLayout.jsx ---
+
+--- \frontend\src\routes\AppRoutes.jsx ---
+frontend\src\routes\AppRoutes.jsx:4:import { getRoleHome } from "./roleHome";
+frontend\src\routes\AppRoutes.jsx:5:import ProtectedRoute from "./ProtectedRoute";
+frontend\src\routes\AppRoutes.jsx:23:import ModulePage from "../pages/ModulePage";
+frontend\src\routes\AppRoutes.jsx:27:const modules = [
+frontend\src\routes\AppRoutes.jsx:44:    return <Navigate to={getRoleHome(roles)} replace />;
+frontend\src\routes\AppRoutes.jsx:49:        <Routes>
+frontend\src\routes\AppRoutes.jsx:50:            <Route path="/" element={<HomeRedirect />} />
+frontend\src\routes\AppRoutes.jsx:51:            <Route path="/login" element={<LoginPage />} />
+frontend\src\routes\AppRoutes.jsx:52:            <Route path="/signup" element={<SignupPage />} />
+frontend\src\routes\AppRoutes.jsx:53:            <Route path="/unauthorized" element={<UnauthorizedPage />} />
+frontend\src\routes\AppRoutes.jsx:55:            <Route element={<ProtectedRoute allowedRoles={["BookingCustomer"]}
+/>}>
+frontend\src\routes\AppRoutes.jsx:56:                <Route path="/customer" element={<CustomerPortalPage />} />
+frontend\src\routes\AppRoutes.jsx:57:                <Route path="/customer/bookings" element={<BookingsPage />} />
+frontend\src\routes\AppRoutes.jsx:58:                <Route path="/customer/bookings/new" element={<BookingsPage />} />
+frontend\src\routes\AppRoutes.jsx:61:            <Route element={<ProtectedRoute allowedRoles={["ShipmentRecipient"]}
+/>}>
+frontend\src\routes\AppRoutes.jsx:62:                <Route path="/recipient" element={<RecipientPortalPage />} />
+frontend\src\routes\AppRoutes.jsx:65:            <Route element={<ProtectedRoute allowedRoles={internalRoles} />}>
+frontend\src\routes\AppRoutes.jsx:66:                <Route path="/app" element={<DashboardLayout />}>
+frontend\src\routes\AppRoutes.jsx:67:                    <Route index element={<Navigate to="overview" replace />} />
+frontend\src\routes\AppRoutes.jsx:68:                    <Route path="overview" element={<CommandCenterPage />} />
+frontend\src\routes\AppRoutes.jsx:69:                    <Route path="bookings" element={<BookingsPage />} />
+frontend\src\routes\AppRoutes.jsx:70:                    <Route path="bookings/new" element={<BookingsPage />} />
+frontend\src\routes\AppRoutes.jsx:71:                    <Route path="shipments" element={<ShipmentsPage />} />
+frontend\src\routes\AppRoutes.jsx:72:                    <Route path="deliveries" element={<DeliveryOperationsPage />}
+/>
+frontend\src\routes\AppRoutes.jsx:73:                    <Route path="shipments/:id" element={<ShipmentDetailsPage />}
+/>
+frontend\src\routes\AppRoutes.jsx:75:                    <Route element={<ProtectedRoute allowedRoles={["Admin"]} />}>
+frontend\src\routes\AppRoutes.jsx:76:                        <Route path="customers" element={<CustomersPage />} />
+frontend\src\routes\AppRoutes.jsx:77:                        <Route path="finance" element={<ModulePage
+title="Finance" description="Finance workspace." />} />
+frontend\src\routes\AppRoutes.jsx:78:                        <Route path="settings" element={<ModulePage
+title="Settings" description="Platform settings." />} />
+frontend\src\routes\AppRoutes.jsx:81:                    {modules.map(module => (
+frontend\src\routes\AppRoutes.jsx:82:                        <Route
+frontend\src\routes\AppRoutes.jsx:83:                            key={module.path}
+frontend\src\routes\AppRoutes.jsx:84:                            path={module.path}
+frontend\src\routes\AppRoutes.jsx:86:                                <ModulePage
+frontend\src\routes\AppRoutes.jsx:87:                                    title={module.title}
+frontend\src\routes\AppRoutes.jsx:88:                                    description={module.description}
+frontend\src\routes\AppRoutes.jsx:96:            <Route path="/404" element={<NotFoundPage />} />
+frontend\src\routes\AppRoutes.jsx:97:            <Route path="*" element={<Navigate to="/404" replace />} />
+
+--- \frontend\src\routes\ProtectedRoute.jsx ---
+frontend\src\routes\ProtectedRoute.jsx:4:function ProtectedRoute({ allowedRoles }) {
+frontend\src\routes\ProtectedRoute.jsx:19:export default ProtectedRoute;
+
+========== 5. PROJECT FILES AND CONFIGURATION NAMES ==========
+
+Mode   : d--h--
+Name   : .git
+Length :
+
+
+Mode   : d-----
+Name   : backend
+Length :
+
+
+Mode   : d-----
+Name   : database
+Length :
+
+
+Mode   : d-----
+Name   : deployment
+Length :
+
+
+Mode   : d-----
+Name   : docs
+Length :
+
+
+Mode   : d-----
+Name   : frontend
+Length :
+
+
+Mode   : d-----
+Name   : logs
+Length :
+
+
+Mode   : d-----
+Name   : tests
+Length :
+
+
+Mode   : d-----
+Name   : _Audit
+Length :
+
+
+Mode   : d-----
+Name   : _Backups
+Length :
+
+
+Mode   : -a----
+Name   : .gitignore
+Length : 917
+
+
+Mode   : -a----
+Name   : Batch_G10_SecureCustomersApi.ps1
+Length : 1980
+
+
+Mode   : -a----
+Name   : Batch_G2_VerifyProject.ps1
+Length : 6896
+
+
+Mode   : -a----
+Name   : Batch_G3_InspectTests.ps1
+Length : 2068
+
+
+Mode   : -a----
+Name   : Batch_G4_InspectCurrentAPI.ps1
+Length : 3308
+
+
+Mode   : -a----
+Name   : Batch_G5_ReviewControllerSecurity.ps1
+Length : 878
+
+
+Mode   : -a----
+Name   : Batch_G6_InspectCustomerPermissions.ps1
+Length : 2021
+
+
+Mode   : -a----
+Name   : Batch_G7_InspectCustomerFrontend.ps1
+Length : 1281
+
+
+Mode   : -a----
+Name   : Batch_G8_InspectAuthIntegration.ps1
+Length : 1749
+
+
+Mode   : -a----
+Name   : Batch_G9_InspectAuthConfiguration.ps1
+Length : 1415
+
+
+Mode   : -a----
+Name   : PHASE1_SOURCE_AUDIT.txt
+Length : 96436
+
+
+Mode   : -a----
+Name   : qubriq_dev_backup_20261124_110950.sql
+Length : 10751
+
+
+Mode   : -a----
+Name   : Qubriq_PreAudit.ps1
+Length : 4351
+
+
+Mode   : -a----
+Name   : README.md
+Length : 986
+
+
+Backend configuration filenames:
+
+Name   : appsettings.Development.json
+Length : 127
+
+
+Name   : appsettings.json
+Length : 151
+
+
+Name   : Qubriq.API.csproj
+Length : 1244
+
+
+Frontend configuration filenames:
+
+Name   : index.html
+Length : 444
+
+
+Name   : package-lock.json
+Length : 33237
+
+
+Name   : package.json
+Length : 441
+
+
+Name   : vite.config.js
+Length : 382
+
+
+========== 6. GENERATED FOLDER INVENTORY ==========
+
+
+
+Folder                                                             SizeMB
+------                                                             ------
+S:\Project_Qubriq\backend\Qubriq.API\bin                            45.97
+S:\Project_Qubriq\backend\Qubriq.API\obj                             1.06
+S:\Project_Qubriq\frontend\dist                                      0.35
+S:\Project_Qubriq\frontend\node_modules                             71.95
+S:\Project_Qubriq\frontend\node_modules\.vite                        3.79
+S:\Project_Qubriq\frontend\node_modules\@rolldown\pluginutils\dist   0.02
+S:\Project_Qubriq\frontend\node_modules\@vitejs\plugin-react\dist    0.03
+S:\Project_Qubriq\frontend\node_modules\cookie\dist                  0.04
+S:\Project_Qubriq\frontend\node_modules\fdir\dist                    0.04
+S:\Project_Qubriq\frontend\node_modules\nanoid\bin                      0
+S:\Project_Qubriq\frontend\node_modules\react-router\dist            4.04
+S:\Project_Qubriq\frontend\node_modules\react-router-dom\dist           0
+S:\Project_Qubriq\frontend\node_modules\rolldown\bin                    0
+S:\Project_Qubriq\frontend\node_modules\rolldown\dist                0.83
+S:\Project_Qubriq\frontend\node_modules\tinyglobby\dist              0.03
+S:\Project_Qubriq\frontend\node_modules\vite\bin                        0
+S:\Project_Qubriq\frontend\node_modules\vite\dist                    2.17
+
+
+
+========== 7. SECRET-SAFE CONFIGURATION CHECK ==========
+
+--- S:\Project_Qubriq\frontend\vite.config.js ---
+        host: "127.0.0.1",
+        proxy: {
+                target: "http://127.0.0.1:5080",
+
+--- S:\Project_Qubriq\backend\Qubriq.API\Program.cs ---
+builder.Services.AddDbContext<QubriqDbContext>(options =>
+    options.UseMySQL(connectionString));
+    .AddAuthentication(options =>
+builder.Services.AddAuthorization(options =>
+            .WithOrigins("http://127.0.0.1:5173")
+app.MapControllers();
+
+========== PRE-AUDIT INVENTORY COMPLETE ==========
+**********************
+Windows PowerShell transcript end
+End time: 20261124172453
+**********************
