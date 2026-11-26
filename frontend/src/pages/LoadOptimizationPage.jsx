@@ -1,155 +1,145 @@
-﻿import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { loadOptimizationService } from "../services/loadOptimizationService";
 import LoadScene3D from "../components/loadOptimization/LoadScene3D";
-import DatabaseLoadOptimization from "../components/loadOptimization/DatabaseLoadOptimization";
 import "../styles/load-optimization.css";
 
-const emptyPackage = () => ({
-    packageId: "",
-    description: "",
-    lengthCm: "",
-    widthCm: "",
-    heightCm: "",
-    weightKg: "",
-    quantity: 1,
-    isFragile: false
-});
-
-const emptyVehicle = {
-    vehicleLengthCm: "",
-    vehicleWidthCm: "",
-    vehicleHeightCm: "",
-    maxPayloadKg: ""
+const number = (value, digits = 1) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed.toFixed(digits) : "—";
 };
 
 function Metric({ label, value, suffix = "" }) {
-    return (
-        <div className="load-metric">
-            <span>{label}</span>
-            <strong>{value}{suffix}</strong>
-        </div>
-    );
+    return <div className="load-metric"><span>{label}</span><strong>{value}{suffix}</strong></div>;
 }
 
-function LoadOptimizationPage() {
-    const [vehicle, setVehicle] = useState(emptyVehicle);
-    const [packages, setPackages] = useState([emptyPackage()]);
+function normalizeResult(payload) {
+    const result = payload?.result ?? payload;
+    return result ? { ...result, vehicleSpace: result.vehicleSpace ?? result.vehicle } : null;
+}
+
+export default function LoadOptimizationPage() {
+    const [assignments, setAssignments] = useState([]);
+    const [selectedKey, setSelectedKey] = useState("");
+    const [runs, setRuns] = useState([]);
     const [response, setResponse] = useState(null);
-    const [loading, setLoading] = useState(false);
+    const [runId, setRunId] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [historyLoading, setHistoryLoading] = useState(false);
+    const [running, setRunning] = useState(false);
+    const [openingRunId, setOpeningRunId] = useState(null);
     const [error, setError] = useState("");
     const [message, setMessage] = useState("");
 
-    function updateVehicle(field, value) {
-        setVehicle(current => ({ ...current, [field]: value }));
-    }
+    const selected = useMemo(
+        () => assignments.find(x => `${x.shipmentId}:${x.vehicleId}` === selectedKey) || null,
+        [assignments, selectedKey]
+    );
 
-    function updatePackage(index, field, value) {
-        setPackages(current => current.map((item, i) =>
-            i === index ? { ...item, [field]: value } : item
-        ));
-    }
+    const totalUnits = (selected?.packages || []).reduce(
+        (sum, item) => sum + Number(item.quantity || 0), 0
+    );
 
-    function addPackage() {
-        setPackages(current => [...current, emptyPackage()]);
-    }
-
-    function removePackage(index) {
-        setPackages(current => current.length === 1
-            ? current
-            : current.filter((_, i) => i !== index)
-        );
-    }
-
-    async function runOptimization(event) {
-        event.preventDefault();
-        setError("");
-        setMessage("");
-        setResponse(null);
-
-        const numericVehicle = {
-            vehicleLengthCm: Number(vehicle.vehicleLengthCm),
-            vehicleWidthCm: Number(vehicle.vehicleWidthCm),
-            vehicleHeightCm: Number(vehicle.vehicleHeightCm),
-            maxPayloadKg: Number(vehicle.maxPayloadKg)
-        };
-
-        const numericPackages = packages.map(item => ({
-            packageId: item.packageId.trim(),
-            description: item.description.trim() || null,
-            lengthCm: Number(item.lengthCm),
-            widthCm: Number(item.widthCm),
-            heightCm: Number(item.heightCm),
-            weightKg: Number(item.weightKg),
-            quantity: Number(item.quantity),
-            isFragile: item.isFragile
-        }));
-
-        const invalidVehicle = Object.values(numericVehicle).some(
-            value => !Number.isFinite(value) || value <= 0
-        );
-
-        if (invalidVehicle) {
-            setError("Enter valid positive vehicle dimensions and payload capacity.");
-            return;
-        }
-
-        const invalidPackage = numericPackages.some(item =>
-            !item.packageId ||
-            ![item.lengthCm, item.widthCm, item.heightCm, item.weightKg, item.quantity]
-                .every(Number.isFinite) ||
-            item.lengthCm <= 0 ||
-            item.widthCm <= 0 ||
-            item.heightCm <= 0 ||
-            item.weightKg <= 0 ||
-            !Number.isInteger(item.quantity) ||
-            item.quantity < 1 ||
-            item.quantity > 200
-        );
-
-        if (invalidPackage) {
-            setError("Check package IDs, dimensions, weights and quantities.");
-            return;
-        }
-
-        const duplicateIds = numericPackages.map(x => x.packageId.toLowerCase());
-        if (new Set(duplicateIds).size !== duplicateIds.length) {
-            setError("Each package group must have a unique Package ID.");
-            return;
-        }
-
+    async function refreshAssignments() {
         setLoading(true);
-
+        setError("");
         try {
-            const result = await loadOptimizationService.optimize({
-                ...numericVehicle,
-                packages: numericPackages
-            });
-
-            setResponse(result);
-
-            setMessage(
-                result.isFeasible
-                    ? "Optimization completed successfully."
-                    : "Optimization completed with unplaced cargo."
-            );
-        } catch (err) {
-            if (err.status === 401) {
-                setError("Your session has expired. Please sign in again.");
-            } else if (err.status === 403) {
-                setError("You do not have the load optimization permission. Ask an administrator to enable it.");
-            } else {
-                setError(err.message || "Optimization request failed.");
+            const data = await loadOptimizationService.getAssignedShipments();
+            const list = Array.isArray(data) ? data : [];
+            setAssignments(list);
+            if (selectedKey && !list.some(x => `${x.shipmentId}:${x.vehicleId}` === selectedKey)) {
+                setSelectedKey("");
+                setRuns([]);
+                setResponse(null);
+                setRunId(null);
             }
+        } catch (err) {
+            setError(err.message || "Unable to load active Fleet assignments.");
         } finally {
             setLoading(false);
         }
     }
 
-    function resetResults() {
+    useEffect(() => { refreshAssignments(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    async function chooseAssignment(key) {
+        setSelectedKey(key);
+        setRuns([]);
         setResponse(null);
+        setRunId(null);
+        setMessage("");
+        setError("");
+        if (!key) return;
+
+        const item = assignments.find(x => `${x.shipmentId}:${x.vehicleId}` === key);
+        if (!item) return;
+
+        setHistoryLoading(true);
+        try {
+            const history = await loadOptimizationService.getShipmentRuns(item.shipmentId);
+            setRuns(Array.isArray(history) ? history : []);
+        } catch (err) {
+            setError(err.message || "Unable to load saved optimization runs.");
+        } finally {
+            setHistoryLoading(false);
+        }
+    }
+
+    async function runOptimization() {
+        if (!selected) return;
+        setRunning(true);
         setError("");
         setMessage("");
+        setResponse(null);
+        setRunId(null);
+        try {
+            const payload = await loadOptimizationService.optimizeShipment(
+                selected.shipmentId, selected.vehicleId
+            );
+            const result = normalizeResult(payload);
+            if (!result) throw new Error("The optimization API returned an empty result.");
+            setResponse(result);
+            setRunId(payload.optimizationRunId ?? null);
+            setMessage(result.isFeasible
+                ? "3D loading plan generated and saved."
+                : "Partial loading plan saved. Review unplaced cargo.");
+
+            const history = await loadOptimizationService.getShipmentRuns(selected.shipmentId);
+            setRuns(Array.isArray(history) ? history : []);
+        } catch (err) {
+            if (err.status === 401) setError("Your session has expired. Please sign in again.");
+            else if (err.status === 403) setError("You do not have permission to run cargo optimization.");
+            else setError(err.message || "Unable to optimize this shipment.");
+        } finally {
+            setRunning(false);
+        }
     }
+
+    async function openRun(id) {
+        setOpeningRunId(id);
+        setError("");
+        setMessage("");
+        try {
+            const payload = await loadOptimizationService.getRun(id);
+            const result = normalizeResult(payload);
+            if (!result) throw new Error("The saved optimization run is empty.");
+            setResponse(result);
+            setRunId(id);
+            setMessage(`Loaded saved optimization run #${id}.`);
+        } catch (err) {
+            setError(err.message || "Unable to open saved run.");
+        } finally {
+            setOpeningRunId(null);
+        }
+    }
+
+    const dimensions = selected
+        ? `${selected.lengthCm ?? "—"} × ${selected.widthCm ?? "—"} × ${selected.heightCm ?? "—"} cm`
+        : "—";
+    const vehicleReady = selected &&
+        Number(selected.lengthCm) > 0 &&
+        Number(selected.widthCm) > 0 &&
+        Number(selected.heightCm) > 0 &&
+        Number(selected.capacityKg) > 0;
 
     return (
         <section className="module-page load-optimization-page">
@@ -157,334 +147,180 @@ function LoadOptimizationPage() {
                 <div>
                     <div className="load-eyebrow">QUBRIQ INTELLIGENCE / FLEET</div>
                     <h1>3D Cargo Optimization</h1>
-                    <p>
-                        Calculate package placements, improve vehicle space
-                        utilization and inspect the loading arrangement in 3D.
-                    </p>
+                    <p>Optimize registered shipment packages using the shared loading dimensions stored in Fleet Management.</p>
                 </div>
-
-                <div className="load-engine-tag">
-                    <span />
-                    Extreme Point 3D Engine
-                </div>
+                <div className="load-engine-tag"><span />Extreme Point 3D Engine</div>
             </div>
 
             {error && <div className="load-alert load-alert-error" role="alert">{error}</div>}
             {message && <div className="load-alert load-alert-success" role="status">{message}</div>}
 
-            <DatabaseLoadOptimization />
-
-            <div className="load-section-heading">
-                <div><span className="load-step">MANUAL</span><h2>Manual optimization</h2></div>
-            </div>
-            <form onSubmit={runOptimization} className="load-form">
-                <div className="load-section-card">
-                    <div className="load-section-heading">
-                        <div>
-                            <span className="load-step">01</span>
-                            <h2>Vehicle loading space</h2>
-                        </div>
-                        <span className="load-unit-note">All dimensions in cm · Weight in kg</span>
-                    </div>
-
-                    <div className="load-input-grid">
-                        <label>
-                            Vehicle length
-                            <input
-                                type="number"
-                                min="1"
-                                step="0.1"
-                                required
-                                placeholder="e.g. 600"
-                                value={vehicle.vehicleLengthCm}
-                                onChange={e => updateVehicle("vehicleLengthCm", e.target.value)}
-                            />
-                        </label>
-
-                        <label>
-                            Vehicle width
-                            <input
-                                type="number"
-                                min="1"
-                                step="0.1"
-                                required
-                                placeholder="e.g. 240"
-                                value={vehicle.vehicleWidthCm}
-                                onChange={e => updateVehicle("vehicleWidthCm", e.target.value)}
-                            />
-                        </label>
-
-                        <label>
-                            Vehicle height
-                            <input
-                                type="number"
-                                min="1"
-                                step="0.1"
-                                required
-                                placeholder="e.g. 240"
-                                value={vehicle.vehicleHeightCm}
-                                onChange={e => updateVehicle("vehicleHeightCm", e.target.value)}
-                            />
-                        </label>
-
-                        <label>
-                            Maximum payload (kg)
-                            <input
-                                type="number"
-                                min="0.01"
-                                step="0.01"
-                                required
-                                placeholder="e.g. 5000"
-                                value={vehicle.maxPayloadKg}
-                                onChange={e => updateVehicle("maxPayloadKg", e.target.value)}
-                            />
-                        </label>
-                    </div>
+            <div className="load-section-card db-optimization-panel">
+                <div className="load-section-heading">
+                    <div><span className="load-step">01</span><h2>Fleet assignment</h2></div>
+                    <button type="button" className="load-add-button" onClick={refreshAssignments} disabled={loading || running}>
+                        {loading ? "Refreshing..." : "Refresh"}
+                    </button>
                 </div>
-
-                <div className="load-section-card">
-                    <div className="load-section-heading">
-                        <div>
-                            <span className="load-step">02</span>
-                            <h2>Cargo packages</h2>
-                        </div>
-
-                        <button type="button" className="load-add-button" onClick={addPackage}>
-                            + Add package
-                        </button>
-                    </div>
-
-                    <p className="load-helper">
-                        Enter individual package dimensions. Quantity creates
-                        multiple identical units of that package group.
-                    </p>
-
-                    <div className="load-package-list">
-                        {packages.map((item, index) => (
-                            <div className="load-package-card" key={index}>
-                                <div className="load-package-heading">
-                                    <strong>Package group {index + 1}</strong>
-                                    <button
-                                        type="button"
-                                        className="load-remove-button"
-                                        disabled={packages.length === 1}
-                                        onClick={() => removePackage(index)}
-                                    >
-                                        Remove
-                                    </button>
-                                </div>
-
-                                <div className="load-package-grid">
-                                    <label>
-                                        Package ID
-                                        <input
-                                            required
-                                            maxLength="80"
-                                            placeholder="PKG-001"
-                                            value={item.packageId}
-                                            onChange={e => updatePackage(index, "packageId", e.target.value)}
-                                        />
-                                    </label>
-
-                                    <label>
-                                        Description
-                                        <input
-                                            maxLength="150"
-                                            placeholder="Carton / Electronics"
-                                            value={item.description}
-                                            onChange={e => updatePackage(index, "description", e.target.value)}
-                                        />
-                                    </label>
-
-                                    <label>
-                                        Length (cm)
-                                        <input
-                                            required
-                                            type="number"
-                                            min="0.1"
-                                            step="0.1"
-                                            value={item.lengthCm}
-                                            onChange={e => updatePackage(index, "lengthCm", e.target.value)}
-                                        />
-                                    </label>
-
-                                    <label>
-                                        Width (cm)
-                                        <input
-                                            required
-                                            type="number"
-                                            min="0.1"
-                                            step="0.1"
-                                            value={item.widthCm}
-                                            onChange={e => updatePackage(index, "widthCm", e.target.value)}
-                                        />
-                                    </label>
-
-                                    <label>
-                                        Height (cm)
-                                        <input
-                                            required
-                                            type="number"
-                                            min="0.1"
-                                            step="0.1"
-                                            value={item.heightCm}
-                                            onChange={e => updatePackage(index, "heightCm", e.target.value)}
-                                        />
-                                    </label>
-
-                                    <label>
-                                        Weight (kg)
-                                        <input
-                                            required
-                                            type="number"
-                                            min="0.01"
-                                            step="0.01"
-                                            value={item.weightKg}
-                                            onChange={e => updatePackage(index, "weightKg", e.target.value)}
-                                        />
-                                    </label>
-
-                                    <label>
-                                        Quantity
-                                        <input
-                                            required
-                                            type="number"
-                                            min="1"
-                                            max="200"
-                                            step="1"
-                                            value={item.quantity}
-                                            onChange={e => updatePackage(index, "quantity", e.target.value)}
-                                        />
-                                    </label>
-
-                                    <label className="load-fragile-control">
-                                        <input
-                                            type="checkbox"
-                                            checked={item.isFragile}
-                                            onChange={e => updatePackage(index, "isFragile", e.target.checked)}
-                                        />
-                                        Fragile cargo
-                                    </label>
-                                </div>
-                            </div>
+                <p className="load-helper">
+                    Select an active shipment and its assigned vehicle. The optimizer reads vehicle
+                    dimensions and payload from Fleet and package details from the shipment.
+                </p>
+                <label className="db-assignment-field">
+                    Shipment / assigned vehicle
+                    <select value={selectedKey} onChange={e => chooseAssignment(e.target.value)} disabled={loading || !assignments.length}>
+                        <option value="">{loading ? "Loading assignments..." : "Select an active assignment"}</option>
+                        {assignments.map(x => (
+                            <option key={`${x.shipmentId}:${x.vehicleId}`} value={`${x.shipmentId}:${x.vehicleId}`}>
+                                {x.trackingNumber} · {x.origin} → {x.destination} · {x.registrationNumber}
+                            </option>
                         ))}
+                    </select>
+                </label>
+
+                {!loading && assignments.length === 0 && (
+                    <div className="db-empty-state">
+                        <strong>No active Fleet assignments</strong>
+                        <span>Assign a confirmed shipment, driver and vehicle in Fleet & Capacity Planning first.</span>
                     </div>
-                </div>
+                )}
 
-                <div className="load-submit-row">
-                    <button
-                        type="button"
-                        className="load-reset-button"
-                        onClick={resetResults}
-                        disabled={loading}
-                    >
-                        Clear results
-                    </button>
+                {selected && (
+                    <>
+                        <div className="db-vehicle-summary">
+                            <div><span>Vehicle</span><strong>{selected.registrationNumber}</strong></div>
+                            <div><span>Type</span><strong>{selected.vehicleType || "—"}</strong></div>
+                            <div><span>Loading space (L × W × H)</span><strong>{dimensions}</strong></div>
+                            <div><span>Maximum payload</span><strong>{number(selected.capacityKg, 2)} kg</strong></div>
+                        </div>
+                        {!vehicleReady && (
+                            <div className="load-alert load-alert-error">
+                                Vehicle loading dimensions or payload are missing. Update this vehicle in Fleet Management.
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
 
-                    <button
-                        type="submit"
-                        className="load-run-button"
-                        disabled={loading}
-                    >
-                        {loading ? "Calculating load..." : "Run 3D optimization"}
-                    </button>
-                </div>
-            </form>
+            {selected && (
+                <>
+                    <div className="load-section-card">
+                        <div className="load-section-heading">
+                            <div><span className="load-step">02</span><h2>Registered shipment packages</h2></div>
+                            <span className="load-unit-note">{selected.packages?.length || 0} groups · {totalUnits} units</span>
+                        </div>
+                        <p className="load-helper">
+                            These are saved package records. Edit dimensions, quantity or fragile handling in the shipment details workflow.
+                        </p>
+                        <div className="load-table-wrap">
+                            <table className="load-placement-table db-package-table">
+                                <thead><tr><th>Package</th><th>Category</th><th>Quantity</th><th>Dimensions (L × W × H)</th><th>Unit weight</th><th>Handling</th></tr></thead>
+                                <tbody>
+                                    {(selected.packages || []).map(p => (
+                                        <tr key={p.id}>
+                                            <td><strong>{p.packageCode || `PKG-${p.id}`}</strong><small>{p.description}</small></td>
+                                            <td>{p.category || "—"}</td>
+                                            <td>{p.quantity}</td>
+                                            <td>{p.lengthCm} × {p.widthCm} × {p.heightCm} cm</td>
+                                            <td>{p.weightKg} kg</td>
+                                            <td>{p.isFragile ? "Fragile" : "Standard"}</td>
+                                        </tr>
+                                    ))}
+                                    {!selected.packages?.length && <tr><td colSpan="6">No package records. Add package groups before optimization.</td></tr>}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div className="db-optimization-actions">
+                            <button type="button" className="load-run-button" onClick={runOptimization}
+                                disabled={running || !vehicleReady || !selected.packages?.length}>
+                                {running ? "Calculating 3D load..." : "Run 3D cargo optimization"}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="load-section-card db-history">
+                        <div className="load-section-heading">
+                            <div><span className="load-step">03</span><h2>Saved optimization runs</h2></div>
+                            <span className="load-unit-note">{historyLoading ? "Loading..." : `${runs.length} runs`}</span>
+                        </div>
+                        {runs.length ? (
+                            <div className="load-table-wrap">
+                                <table className="load-placement-table">
+                                    <thead><tr><th>Run</th><th>Created</th><th>Status</th><th>Placed</th><th>Space</th><th>Payload</th><th /></tr></thead>
+                                    <tbody>
+                                        {runs.map(r => (
+                                            <tr key={r.id}>
+                                                <td>#{r.id}</td>
+                                                <td>{r.createdAtUtc ? new Date(r.createdAtUtc).toLocaleString() : "—"}</td>
+                                                <td>{r.status}</td>
+                                                <td>{r.placedPackages} / {r.totalPackages}</td>
+                                                <td>{number(r.volumeUtilizationPercent)}%</td>
+                                                <td>{number(r.weightUtilizationPercent ?? r.payloadUtilizationPercent)}%</td>
+                                                <td><button type="button" className="load-add-button" disabled={openingRunId !== null} onClick={() => openRun(r.id)}>{openingRunId === r.id ? "Opening..." : "View"}</button></td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : <p className="load-no-items">{historyLoading ? "Retrieving saved runs..." : "No saved optimization runs for this shipment."}</p>}
+                    </div>
+                </>
+            )}
 
             {response && (
                 <div className="load-results">
                     <div className="load-section-heading load-results-heading">
-                        <div>
-                            <span className="load-step">03</span>
-                            <h2>Optimization results</h2>
-                        </div>
+                        <div><span className="load-step">04</span><h2>Optimization result{runId ? ` · Run #${runId}` : ""}</h2></div>
                         <span className={`load-result-status ${response.isFeasible ? "feasible" : "partial"}`}>
                             {response.status || (response.isFeasible ? "Feasible" : "Partial load")}
                         </span>
                     </div>
-
                     <div className="load-metrics-grid">
                         <Metric label="Packages placed" value={`${response.placedPackages ?? 0} / ${response.totalPackages ?? 0}`} />
-                        <Metric label="Space utilization" value={Number(response.volumeUtilizationPercent || 0).toFixed(1)} suffix="%" />
-                        <Metric label="Payload utilization" value={Number(response.payloadUtilizationPercent || 0).toFixed(1)} suffix="%" />
-                        <Metric label="Remaining payload" value={Number(response.remainingPayloadKg || 0).toFixed(1)} suffix=" kg" />
+                        <Metric label="Space utilization" value={number(response.volumeUtilizationPercent)} suffix="%" />
+                        <Metric label="Payload utilization" value={number(response.payloadUtilizationPercent ?? response.weightUtilizationPercent)} suffix="%" />
+                        <Metric label="Remaining payload" value={number(response.remainingPayloadKg)} suffix=" kg" />
                     </div>
-
                     <div className="load-visual-card">
                         <div className="load-visual-heading">
-                            <div>
-                                <h2>Interactive loading arrangement</h2>
-                                <p>Explore the calculated cargo layout.</p>
-                            </div>
+                            <div><h2>Interactive 3D loading arrangement</h2><p>Drag to rotate · Scroll to zoom</p></div>
                             <span>{response.placements?.length || 0} placements</span>
                         </div>
-
                         <LoadScene3D response={response} />
                     </div>
-
                     <div className="load-detail-grid">
                         <div className="load-detail-card">
                             <h3>Unplaced packages</h3>
-
                             {response.unplacedItems?.length ? (
                                 <div className="load-unplaced-list">
-                                    {response.unplacedItems.map((item, index) => (
-                                        <div className="load-unplaced-item" key={`${item.packageId}-${item.unitNumber}-${index}`}>
-                                            <strong>{item.packageId} · Unit {item.unitNumber}</strong>
-                                            <span>{item.reason}</span>
+                                    {response.unplacedItems.map((x, i) => (
+                                        <div className="load-unplaced-item" key={`${x.packageId}-${x.unitNumber}-${i}`}>
+                                            <strong>{x.description || x.packageId} · Unit {x.unitNumber}</strong><span>{x.reason}</span>
                                         </div>
                                     ))}
                                 </div>
-                            ) : (
-                                <p className="load-no-items">All package units were placed.</p>
-                            )}
+                            ) : <p className="load-no-items">All package units were placed.</p>}
                         </div>
-
                         <div className="load-detail-card">
                             <h3>Optimization warnings</h3>
-
-                            {response.warnings?.length ? (
-                                <ul className="load-warning-list">
-                                    {response.warnings.map((warning, index) => (
-                                        <li key={index}>{warning}</li>
-                                    ))}
-                                </ul>
-                            ) : (
-                                <p className="load-no-items">No warnings reported.</p>
-                            )}
+                            {response.warnings?.length ? <ul className="load-warning-list">{response.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul> : <p className="load-no-items">No warnings reported.</p>}
                         </div>
                     </div>
-
                     <div className="load-detail-card load-placement-card">
-                        <h3>Package placement details</h3>
-
+                        <h3>Package placement coordinates</h3>
                         <div className="load-table-wrap">
                             <table className="load-placement-table">
-                                <thead>
-                                    <tr>
-                                        <th>Package</th>
-                                        <th>Unit</th>
-                                        <th>Position X / Y / Z</th>
-                                        <th>Dimensions L / W / H</th>
-                                        <th>Weight</th>
-                                        <th>Orientation</th>
-                                    </tr>
-                                </thead>
+                                <thead><tr><th>Package</th><th>Unit</th><th>Position X / Y / Z</th><th>Placed dimensions L / W / H</th><th>Weight</th><th>Orientation</th></tr></thead>
                                 <tbody>
-                                    {(response.placements || []).map((item, index) => (
-                                        <tr key={`${item.packageId}-${item.unitNumber}-${index}`}>
-                                            <td>{item.packageId}</td>
-                                            <td>{item.unitNumber}</td>
-                                            <td>{item.x} / {item.y} / {item.z} cm</td>
-                                            <td>{item.lengthCm} × {item.widthCm} × {item.heightCm} cm</td>
-                                            <td>{item.weightKg} kg</td>
-                                            <td>{item.orientation}</td>
+                                    {(response.placements || []).map((x, i) => (
+                                        <tr key={`${x.packageId}-${x.unitNumber}-${i}`}>
+                                            <td>{x.description || x.packageId}</td><td>{x.unitNumber}</td>
+                                            <td>{x.x} / {x.y} / {x.z} cm</td>
+                                            <td>{x.lengthCm} × {x.widthCm} × {x.heightCm} cm</td>
+                                            <td>{x.weightKg} kg</td><td>{x.orientation}</td>
                                         </tr>
                                     ))}
-
-                                    {!response.placements?.length && (
-                                        <tr><td colSpan="6">No packages were placed.</td></tr>
-                                    )}
+                                    {!response.placements?.length && <tr><td colSpan="6">No packages were placed.</td></tr>}
                                 </tbody>
                             </table>
                         </div>
@@ -494,6 +330,3 @@ function LoadOptimizationPage() {
         </section>
     );
 }
-
-export default LoadOptimizationPage;
-

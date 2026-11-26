@@ -75,11 +75,21 @@ public class DispatcherController : ControllerBase
         var deliveredShipments = await _db.Shipments
             .CountAsync(x => x.Status == "Delivered");
 
+        // Count only vehicles without an active shipment assignment
         var availableVehicles = await _db.Vehicles
-            .CountAsync(x => x.Status == "Available");
+            .CountAsync(v =>
+                v.Status == "Available" &&
+                !_db.ShipmentAssignments.Any(a =>
+                    a.VehicleId == v.Id &&
+                    a.Status == "Active"));
 
+        // Count only drivers without an active shipment assignment
         var availableDrivers = await _db.Drivers
-            .CountAsync(x => x.Status == "Available");
+            .CountAsync(d =>
+                d.Status == "Available" &&
+                !_db.ShipmentAssignments.Any(a =>
+                    a.DriverId == d.Id &&
+                    a.Status == "Active"));
 
         var activeAssignments = await _db.ShipmentAssignments
             .CountAsync(x => x.Status == "Active");
@@ -270,6 +280,20 @@ public class DispatcherController : ControllerBase
 
         var previousStatus = shipment.Status;
         shipment.Status = target;
+
+        if (target == "Delivered")
+        {
+            var activeAssignment = await _db.ShipmentAssignments
+                .FirstOrDefaultAsync(a =>
+                    a.ShipmentId == shipment.Id &&
+                    a.Status == "Active");
+
+            if (activeAssignment != null)
+            {
+                activeAssignment.Status = "Completed";
+                activeAssignment.ReleasedAtUtc = DateTime.UtcNow;
+            }
+        }
 
         await _db.SaveChangesAsync();
 

@@ -1,26 +1,24 @@
-﻿import { apiRequest } from "./apiClient";
+import { apiRequest } from "./apiClient";
 
 const BASE = "/api/load-optimization";
 
 export const loadOptimizationService = {
-    optimize: (request) =>
-        apiRequest(`${BASE}/optimize`, {
-            method: "POST",
-            body: JSON.stringify(request)
-        }),
+    // Retained for backward compatibility with the original manual optimizer.
+    optimize: request => apiRequest(`${BASE}/optimize`, {
+        method: "POST",
+        body: JSON.stringify(request)
+    }),
 
-    getAssignedShipments: () =>
-        apiRequest(`${BASE}/assigned-shipments`),
+    // Fleet-integrated endpoints.
+    getAssignedShipments: () => apiRequest(`${BASE}/assigned-shipments`),
 
     optimizeShipment: (shipmentId, vehicleId) =>
-        apiRequest(
-            `${BASE}/shipments/${shipmentId}/vehicles/${vehicleId}/optimize`,
-            { method: "POST" }
-        ),
+        apiRequest(`${BASE}/shipments/${shipmentId}/vehicles/${vehicleId}/optimize`, {
+            method: "POST"
+        }),
 
-    getShipmentRuns: (shipmentId) =>
+    getShipmentRuns: shipmentId =>
         apiRequest(`${BASE}/shipments/${shipmentId}/runs`),
 
-    getRun: (runId) =>
-        apiRequest(`${BASE}/runs/${runId}`)
+    getRun: runId => apiRequest(`${BASE}/runs/${runId}`)
 };

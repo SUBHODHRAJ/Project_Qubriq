@@ -1,0 +1,120 @@
+/* Fleet & Capacity Planning — focused, light operational UI */
+.fleet-planning-page {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    color: #17243a;
+}
+.fleet-page-header {
+    display:flex; align-items:flex-end; justify-content:space-between; gap:24px;
+}
+.fleet-eyebrow { display:block; margin-bottom:8px; color:#64748b; font-size:10px; font-weight:800; letter-spacing:1.35px; }
+.fleet-page-header h1 { margin:0; color:#142b47; font-size:27px; letter-spacing:-.6px; }
+.fleet-page-header p { max-width:700px; margin:7px 0 0; color:#718096; font-size:13px; line-height:1.55; }
+.fleet-header-actions { display:flex; gap:9px; flex-shrink:0; }
+.fleet-header-actions button { min-height:38px; padding:0 14px; }
+.fleet-tabs { display:flex; gap:5px; padding:5px; border:1px solid #e4eaf2; border-radius:10px; background:#f8fafc; width:max-content; max-width:100%; }
+.fleet-tabs button { display:flex; align-items:center; gap:8px; border:0; border-radius:7px; padding:9px 14px; background:transparent; color:#64748b; font-size:12px; font-weight:650; cursor:pointer; }
+.fleet-tabs button.active { background:#fff; color:#1d4ed8; box-shadow:0 1px 4px rgba(15,35,66,.10); }
+.fleet-tabs button span { min-width:19px; padding:2px 5px; border-radius:20px; background:#eef2f7; color:#64748b; text-align:center; font-size:10px; }
+.fleet-tabs button.active span { background:#eff6ff; color:#1d4ed8; }
+.fleet-metric-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:13px; }
+.fleet-metric-card { display:flex; align-items:flex-start; gap:13px; min-width:0; padding:18px; border:1px solid #e5eaf1; border-radius:11px; background:#fff; box-shadow:0 2px 8px rgba(15,35,66,.025); }
+.fleet-metric-icon { display:grid; place-items:center; flex:0 0 36px; height:36px; border-radius:9px; background:#eff6ff; color:#2563eb; font-size:17px; font-weight:700; }
+.fleet-metric-icon.available { background:#ecfdf3; color:#039855; }
+.fleet-metric-card small { display:block; color:#718096; font-size:11px; font-weight:600; }
+.fleet-metric-card strong { display:block; margin-top:5px; color:#172b4d; font-size:25px; line-height:1.1; letter-spacing:-.5px; }
+.fleet-metric-card strong em { color:#64748b; font-size:12px; font-style:normal; font-weight:600; }
+.fleet-metric-card p { margin:5px 0 0; color:#98a2b3; font-size:10px; }
+.fleet-overview-grid { display:grid; grid-template-columns:1fr 1fr; gap:15px; }
+.fleet-panel { min-width:0; padding:20px; border:1px solid #e5eaf1; border-radius:11px; background:#fff; box-shadow:0 2px 8px rgba(15,35,66,.025); }
+.fleet-panel-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:17px; }
+.fleet-panel-heading h2 { margin:0; color:#1b2d46; font-size:15px; font-weight:750; }
+.fleet-panel-heading p { margin:5px 0 0; color:#8793a5; font-size:11px; line-height:1.45; }
+.fleet-text-button { border:0; padding:4px 0; background:transparent; color:#2563eb; font-size:11px; font-weight:700; white-space:nowrap; cursor:pointer; }
+.fleet-status-list { display:grid; gap:15px; }
+.fleet-status-label { display:flex; align-items:center; gap:8px; margin-bottom:7px; color:#526176; font-size:11px; }
+.fleet-status-label strong { margin-left:auto; color:#25364d; font-size:11px; }
+.fleet-status-dot { width:8px; height:8px; border-radius:50%; background:#98a2b3; }
+.fleet-status-dot.available { background:#12b76a; }
+.fleet-status-dot.ontrip { background:#3b82f6; }
+.fleet-status-dot.maintenance { background:#f79009; }
+.fleet-status-dot.inactive { background:#98a2b3; }
+.fleet-progress { height:6px; overflow:hidden; border-radius:20px; background:#f0f2f5; }
+.fleet-progress span { display:block; height:100%; min-width:0; border-radius:20px; background:#98a2b3; }
+.fleet-progress span.available { background:#12b76a; }
+.fleet-progress span.ontrip { background:#3b82f6; }
+.fleet-progress span.maintenance { background:#f79009; }
+.fleet-availability-foot { margin-top:18px; padding-top:13px; border-top:1px solid #eef1f5; color:#7b8797; font-size:11px; }
+.fleet-availability-foot strong { color:#039855; }
+.fleet-capacity-summary { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:22px 0 15px; }
+.fleet-capacity-summary div { padding:15px; border:1px solid #edf0f5; border-radius:9px; background:#fafbfd; }
+.fleet-capacity-summary span { display:block; color:#7b8797; font-size:10px; }
+.fleet-capacity-summary strong { display:block; margin-top:7px; color:#1b2d46; font-size:19px; }
+.fleet-capacity-note { color:#8793a5; font-size:10px; line-height:1.55; }
+.fleet-outline-action { display:flex; justify-content:space-between; align-items:center; width:100%; margin-top:17px; padding:11px 13px; border:1px solid #dbe6f5; border-radius:8px; background:#f8fbff; color:#245ac5; font-size:11px; font-weight:700; cursor:pointer; }
+.fleet-vehicle-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:11px; }
+.fleet-vehicle-card { min-width:0; padding:14px; border:1px solid #edf0f5; border-radius:9px; background:#fff; }
+.fleet-vehicle-card-top { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:12px; }
+.fleet-vehicle-symbol { display:grid; place-items:center; width:30px; height:30px; border-radius:8px; background:#eff6ff; color:#2563eb; }
+.fleet-vehicle-card > strong { display:block; color:#1d2f49; font-size:13px; }
+.fleet-vehicle-type { display:block; margin-top:3px; color:#8793a5; font-size:10px; }
+.fleet-vehicle-specs { display:grid; gap:6px; margin:13px 0; padding:10px 0; border-top:1px solid #f0f2f5; border-bottom:1px solid #f0f2f5; color:#8793a5; font-size:10px; }
+.fleet-vehicle-specs b { color:#34445a; }
+.fleet-status-pill { display:inline-flex; align-items:center; padding:4px 8px; border-radius:20px; background:#f2f4f7; color:#667085; font-size:9px; font-weight:750; white-space:nowrap; }
+.fleet-status-pill.available { background:#ecfdf3; color:#027a48; }
+.fleet-status-pill.ontrip { background:#eff8ff; color:#175cd3; }
+.fleet-status-pill.maintenance { background:#fffaeb; color:#b54708; }
+.fleet-status-pill.inactive,
+.fleet-status-pill.onleave { background:#f2f4f7; color:#667085; }
+.fleet-form-panel { padding-bottom:16px; }
+.fleet-form { padding:0; }
+.fleet-form-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+.fleet-form-grid label { display:flex; flex-direction:column; gap:7px; min-width:0; color:#526176; font-size:11px; font-weight:650; }
+.fleet-form-grid input, .fleet-form-grid select, .fleet-filters input, .fleet-filters select, .fleet-table select { width:100%; min-width:0; box-sizing:border-box; min-height:38px; padding:8px 10px; border:1px solid #dce3ec; border-radius:7px; outline:none; background:#fff; color:#26364b; font:inherit; font-size:11px; }
+.fleet-form-grid input:focus, .fleet-form-grid select:focus, .fleet-filters input:focus, .fleet-filters select:focus { border-color:#7aa5f8; box-shadow:0 0 0 3px rgba(37,99,235,.08); }
+.fleet-form-footer { display:flex; align-items:center; justify-content:space-between; gap:15px; margin-top:17px; padding-top:14px; border-top:1px solid #eef1f5; }
+.fleet-form-footer p { margin:0; color:#8793a5; font-size:10px; line-height:1.5; }
+.fleet-form-footer button { min-height:36px; padding:0 14px; flex-shrink:0; }
+.fleet-list-heading { align-items:center; }
+.fleet-filters { display:flex; gap:8px; width:min(440px,60%); }
+.fleet-filters input { flex:1; }
+.fleet-filters select { width:135px; }
+.fleet-table-wrap { width:100%; overflow-x:auto; }
+.fleet-table { width:100%; border-collapse:collapse; min-width:760px; text-align:left; }
+.fleet-table th { padding:11px 12px; border-bottom:1px solid #e9edf3; background:#fafbfd; color:#8793a5; font-size:9px; font-weight:750; letter-spacing:.45px; text-transform:uppercase; white-space:nowrap; }
+.fleet-table td { padding:13px 12px; border-bottom:1px solid #f0f2f5; color:#526176; font-size:11px; vertical-align:middle; }
+.fleet-table tbody tr:last-child td { border-bottom:0; }
+.fleet-table td strong { display:block; color:#25364d; font-size:11px; }
+.fleet-table td small { display:block; margin-top:4px; color:#98a2b3; font-size:10px; }
+.fleet-row-actions { display:flex; align-items:center; gap:8px; }
+.fleet-row-actions button { border:0; background:transparent; color:#2563eb; font-size:10px; font-weight:700; cursor:pointer; }
+.fleet-row-actions select, .fleet-table select { min-height:30px; width:auto; padding:5px 7px; font-size:10px; }
+.fleet-empty, .fleet-empty-cell, .fleet-loading { padding:25px; color:#8793a5; text-align:center; font-size:12px; }
+.fleet-empty-cell { text-align:center !important; }
+.fleet-shipment-summary { margin-top:16px; padding:14px; border:1px solid #e6edf7; border-radius:9px; background:#f8fbff; }
+.fleet-shipment-summary > strong { color:#34445a; font-size:11px; }
+.fleet-shipment-summary > div { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:12px; }
+.fleet-shipment-summary span { color:#8793a5; font-size:9px; }
+.fleet-shipment-summary b { display:block; margin-top:4px; color:#25364d; font-size:11px; overflow-wrap:anywhere; }
+@media (max-width:1100px) {
+    .fleet-metric-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .fleet-vehicle-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width:760px) {
+    .fleet-page-header { align-items:flex-start; flex-direction:column; }
+    .fleet-overview-grid { grid-template-columns:1fr; }
+    .fleet-form-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .fleet-shipment-summary > div { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width:520px) {
+    .fleet-metric-grid, .fleet-vehicle-grid, .fleet-form-grid, .fleet-capacity-summary { grid-template-columns:1fr; }
+    .fleet-header-actions { width:100%; }
+    .fleet-header-actions button { flex:1; }
+    .fleet-tabs { width:100%; overflow-x:auto; }
+    .fleet-tabs button { padding:9px 10px; white-space:nowrap; }
+    .fleet-list-heading { align-items:flex-start; flex-direction:column; }
+    .fleet-filters { width:100%; }
+    .fleet-form-footer { align-items:stretch; flex-direction:column; }
+    .fleet-form-footer button { width:100%; }
+}

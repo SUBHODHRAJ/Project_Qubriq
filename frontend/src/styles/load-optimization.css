@@ -585,3 +585,60 @@
         min-width: 0;
     }
 }
+
+
+/* Fleet-integrated 3D optimization workflow */
+.db-assignment-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-width: 720px;
+    color: var(--text-secondary, #aab6c7);
+    font-size: 12px;
+    font-weight: 700;
+}
+.db-assignment-field select {
+    width: 100%;
+    min-height: 44px;
+    border: 1px solid var(--border-color, #34445a);
+    border-radius: 8px;
+    padding: 0 12px;
+    color: var(--text-primary, #e8edf5);
+    background: var(--input-bg, #0b1525);
+}
+.db-empty-state {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    margin-top: 18px;
+    padding: 18px;
+    border: 1px dashed rgba(148, 163, 184, 0.3);
+    border-radius: 10px;
+    color: var(--text-secondary, #9aa8ba);
+    font-size: 12px;
+    line-height: 1.6;
+}
+.db-empty-state strong {
+    color: var(--text-primary, #e8edf5);
+    font-size: 14px;
+}
+.db-package-table td:first-child { min-width: 170px; }
+.db-package-table td small {
+    display: block;
+    margin-top: 4px;
+    color: var(--text-secondary, #9aa8ba);
+    font-size: 11px;
+}
+.db-optimization-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 20px;
+}
+.db-optimization-actions .load-run-button { min-width: 260px; }
+.db-history { margin-top: 4px; }
+@media (max-width: 650px) {
+    .db-assignment-field { max-width: none; width: 100%; }
+    .db-optimization-actions { justify-content: stretch; }
+    .db-optimization-actions .load-run-button { width: 100%; min-width: 0; }
+}
+

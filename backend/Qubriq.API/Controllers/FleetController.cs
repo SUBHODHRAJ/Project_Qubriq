@@ -83,7 +83,7 @@ public class FleetController : ControllerBase
                 x.CargoLengthCm,
                 x.CargoWidthCm,
                 x.CargoHeightCm,
-                x.Status
+                Status = _db.ShipmentAssignments.Any(a =>a.VehicleId == x.Id && a.Status == "Active")? "Assigned": x.Status
             }).ToListAsync();
 
         return Ok(items);
@@ -221,7 +221,7 @@ public class FleetController : ControllerBase
                 x.FullName,
                 x.Phone,
                 x.LicenseNumber,
-                x.Status,
+                Status = _db.ShipmentAssignments.Any(a =>a.DriverId == x.Id && a.Status == "Active") ? "Assigned": x.Status,
                 x.UserId
             }).ToListAsync();
 
