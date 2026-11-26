@@ -1,0 +1,756 @@
+﻿STAGE 3 - MISSING INSPECTION SECTIONS
+
+
+================================================================================
+FILE: backend\Qubriq.API\Data\QubriqDbContext.cs
+================================================================================
+using Microsoft.EntityFrameworkCore;
+using Qubriq.API.Models;
+
+namespace Qubriq.API.Data;
+
+public class QubriqDbContext : DbContext
+{
+    public QubriqDbContext(DbContextOptions<QubriqDbContext> options)
+        : base(options)
+    {
+    }
+
+    public DbSet<User> Users => Set<User>();
+    public DbSet<Role> Roles => Set<Role>();
+    public DbSet<UserRole> UserRoles => Set<UserRole>();
+    public DbSet<Permission> Permissions => Set<Permission>();
+    public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+    public DbSet<ExternalLogin> ExternalLogins => Set<ExternalLogin>();
+    public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<Shipment> Shipments => Set<Shipment>();
+    public DbSet<Vehicle> Vehicles => Set<Vehicle>();
+    public DbSet<Driver> Drivers => Set<Driver>();
+    public DbSet<ShipmentAssignment> ShipmentAssignments => Set<ShipmentAssignment>();
+    public DbSet<ShipmentRecipient> ShipmentRecipients => Set<ShipmentRecipient>();
+    public DbSet<DeliveryProof> DeliveryProofs => Set<DeliveryProof>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        // ==========================================
+        // USERS
+        // ==========================================
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.ToTable("Users");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.FullName)
+                .HasMaxLength(150)
+                .IsRequired();
+
+            entity.Property(x => x.Email)
+                .HasMaxLength(254)
+                .IsRequired();
+
+            entity.Property(x => x.PasswordHash)
+                .HasMaxLength(500)
+                .IsRequired(false);
+
+            entity.Property(x => x.RecipientType)
+                .HasMaxLength(30);
+
+            entity.HasIndex(x => x.Email).IsUnique();
+
+            entity.HasOne(x => x.Customer)
+                .WithOne(x => x.User)
+                .HasForeignKey<Customer>(x => x.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.Driver)
+                .WithOne(x => x.User)
+                .HasForeignKey<Driver>(x => x.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ==========================================
+        // ROLES
+        // ==========================================
+
+        modelBuilder.Entity<Role>(entity =>
+        {
+            entity.ToTable("Roles");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Name)
+                .HasMaxLength(60)
+                .IsRequired();
+
+            entity.Property(x => x.Description)
+                .HasMaxLength(250);
+
+            entity.HasIndex(x => x.Name).IsUnique();
+        });
+
+        // ==========================================
+        // USER ROLES
+        // ==========================================
+
+        modelBuilder.Entity<UserRole>(entity =>
+        {
+            entity.ToTable("UserRoles");
+            entity.HasKey(x => new { x.UserId, x.RoleId });
+
+            entity.HasOne(x => x.User)
+                .WithMany(x => x.UserRoles)
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.Role)
+                .WithMany(x => x.UserRoles)
+                .HasForeignKey(x => x.RoleId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ==========================================
+        // PERMISSIONS
+        // ==========================================
+
+        modelBuilder.Entity<Permission>(entity =>
+        {
+            entity.ToTable("Permissions");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Code)
+                .HasMaxLength(120)
+                .IsRequired();
+
+            entity.Property(x => x.Module)
+                .HasMaxLength(80)
+                .IsRequired();
+
+            entity.Property(x => x.Action)
+                .HasMaxLength(80)
+                .IsRequired();
+
+            entity.Property(x => x.Description)
+                .HasMaxLength(300);
+
+            entity.HasIndex(x => x.Code).IsUnique();
+        });
+
+        // ==========================================
+        // ROLE PERMISSIONS
+        // ==========================================
+
+        modelBuilder.Entity<RolePermission>(entity =>
+        {
+            entity.ToTable("RolePermissions");
+            entity.HasKey(x => new { x.RoleId, x.PermissionId });
+
+            entity.HasOne(x => x.Role)
+                .WithMany(x => x.RolePermissions)
+                .HasForeignKey(x => x.RoleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.Permission)
+                .WithMany(x => x.RolePermissions)
+                .HasForeignKey(x => x.PermissionId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ==========================================
+        // EXTERNAL LOGINS
+        // ==========================================
+
+        modelBuilder.Entity<ExternalLogin>(entity =>
+        {
+            entity.ToTable("ExternalLogins");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Provider)
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(x => x.ProviderSubject)
+                .HasMaxLength(255)
+                .IsRequired();
+
+            entity.HasIndex(x => new
+            {
+                x.Provider,
+                x.ProviderSubject
+            }).IsUnique();
+
+            entity.HasIndex(x => x.UserId);
+
+            entity.HasOne(x => x.User)
+                .WithMany(x => x.ExternalLogins)
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ==========================================
+        // CUSTOMERS
+        // ==========================================
+
+        modelBuilder.Entity<Customer>(entity =>
+        {
+            entity.ToTable("Customers");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.CompanyName)
+                .HasMaxLength(200)
+                .IsRequired();
+
+            entity.Property(x => x.ContactName).HasMaxLength(150);
+            entity.Property(x => x.Email).HasMaxLength(254);
+            entity.Property(x => x.Phone).HasMaxLength(30);
+            entity.Property(x => x.Address).HasMaxLength(500);
+
+            entity.HasIndex(x => x.UserId).IsUnique();
+        });
+
+        // ==========================================
+        // SHIPMENTS
+        // ==========================================
+
+        modelBuilder.Entity<Shipment>(entity =>
+        {
+            entity.ToTable("Shipments");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.TrackingNumber)
+                .HasMaxLength(60)
+                .IsRequired();
+
+            entity.Property(x => x.Origin)
+                .HasMaxLength(250)
+                .IsRequired();
+
+            entity.Property(x => x.Destination)
+                .HasMaxLength(250)
+                .IsRequired();
+
+            entity.Property(x => x.Status)
+                .HasMaxLength(40)
+                .IsRequired();
+
+            // Existing booking details
+            entity.Property(x => x.CargoName)
+                .HasMaxLength(200)
+                .IsRequired(false);
+
+            entity.Property(x => x.CargoCategory).HasMaxLength(100);
+            entity.Property(x => x.PackageCount).IsRequired(false);
+
+            entity.Property(x => x.TotalWeightKg)
+                .HasPrecision(12, 2)
+                .IsRequired(false);
+
+            entity.Property(x => x.LengthCm).HasPrecision(12, 2);
+            entity.Property(x => x.WidthCm).HasPrecision(12, 2);
+            entity.Property(x => x.HeightCm).HasPrecision(12, 2);
+
+            entity.Property(x => x.IsFragile).IsRequired(false);
+
+            entity.Property(x => x.SpecialHandlingRequirements)
+                .HasMaxLength(500);
+
+            entity.Property(x => x.Priority)
+                .HasMaxLength(20)
+                .IsRequired(false);
+
+            entity.Property(x => x.PickupDateUtc).IsRequired(false);
+            entity.Property(x => x.DeliveryTimeWindow).HasMaxLength(100);
+            entity.Property(x => x.AdditionalInstructions).HasMaxLength(1000);
+
+            entity.HasIndex(x => x.TrackingNumber).IsUnique();
+
+            entity.HasOne(x => x.Customer)
+                .WithMany(x => x.Shipments)
+                .HasForeignKey(x => x.CustomerId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ==========================================
+        // VEHICLES
+        // ==========================================
+
+        modelBuilder.Entity<Vehicle>(entity =>
+        {
+            entity.ToTable("Vehicles");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.RegistrationNumber)
+                .HasMaxLength(30)
+                .IsRequired();
+
+            entity.Property(x => x.VehicleType)
+                .HasMaxLength(80)
+                .IsRequired();
+
+            entity.Property(x => x.CapacityKg)
+                .HasColumnType("decimal(12,2)");
+
+            entity.Property(x => x.Status)
+                .HasMaxLength(40)
+                .IsRequired();
+
+            entity.HasIndex(x => x.RegistrationNumber).IsUnique();
+        });
+
+        // ==========================================
+        // DRIVERS
+        // ==========================================
+
+        modelBuilder.Entity<Driver>(entity =>
+        {
+            entity.ToTable("Drivers");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.FullName)
+                .HasMaxLength(150)
+                .IsRequired();
+
+            entity.Property(x => x.Phone).HasMaxLength(30);
+
+            entity.Property(x => x.LicenseNumber)
+                .HasMaxLength(60)
+                .IsRequired();
+
+            entity.Property(x => x.Status)
+                .HasMaxLength(40)
+                .IsRequired();
+
+            entity.HasIndex(x => x.LicenseNumber).IsUnique();
+            entity.HasIndex(x => x.UserId).IsUnique();
+        });
+
+        // ==========================================
+        // SHIPMENT ASSIGNMENTS
+        // ==========================================
+
+        modelBuilder.Entity<ShipmentAssignment>(entity =>
+        {
+            entity.ToTable("ShipmentAssignments");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Status)
+                .HasMaxLength(40)
+                .IsRequired();
+
+            entity.HasOne(x => x.Shipment)
+                .WithMany(x => x.Assignments)
+                .HasForeignKey(x => x.ShipmentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.Vehicle)
+                .WithMany(x => x.Assignments)
+                .HasForeignKey(x => x.VehicleId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.Driver)
+                .WithMany(x => x.Assignments)
+                .HasForeignKey(x => x.DriverId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(x => x.ShipmentId);
+            entity.HasIndex(x => x.VehicleId);
+            entity.HasIndex(x => x.DriverId);
+        });
+
+        // ==========================================
+        // SHIPMENT RECIPIENTS
+        // ==========================================
+
+        modelBuilder.Entity<ShipmentRecipient>(entity =>
+        {
+            entity.ToTable("ShipmentRecipients");
+            entity.HasKey(x => x.Id);
+
+            entity.HasOne(x => x.Shipment)
+                .WithMany()
+                .HasForeignKey(x => x.ShipmentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.User)
+                .WithMany(x => x.ShipmentRecipients)
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(x => new
+            {
+                x.ShipmentId,
+                x.UserId
+            }).IsUnique();
+        });
+
+        // ==========================================
+        // DELIVERY PROOFS
+        // ==========================================
+
+        modelBuilder.Entity<DeliveryProof>(entity =>
+        {
+            entity.ToTable("DeliveryProofs");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.ProofType)
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(x => x.FileReference)
+                .HasMaxLength(500);
+
+            entity.Property(x => x.Remarks)
+                .HasMaxLength(1000);
+
+            entity.HasOne(x => x.Shipment)
+                .WithMany()
+                .HasForeignKey(x => x.ShipmentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.SubmittedByUser)
+                .WithMany(x => x.DeliveryProofs)
+                .HasForeignKey(x => x.SubmittedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(x => x.ShipmentId);
+            entity.HasIndex(x => x.SubmittedByUserId);
+        });
+
+        // ==========================================
+        // AUDIT LOGS
+        // ==========================================
+
+        modelBuilder.Entity<AuditLog>(entity =>
+        {
+            entity.ToTable("AuditLogs");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Action)
+                .HasMaxLength(120)
+                .IsRequired();
+
+            entity.Property(x => x.EntityType)
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.Property(x => x.EntityId)
+                .HasMaxLength(100);
+
+            entity.Property(x => x.Details)
+                .HasColumnType("longtext");
+
+            entity.HasOne(x => x.User)
+                .WithMany(x => x.AuditLogs)
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(x => x.UserId);
+            entity.HasIndex(x => x.CreatedAtUtc);
+            entity.HasIndex(x => new
+            {
+                x.EntityType,
+                x.EntityId
+            });
+        });
+    }
+}
+
+
+================================================================================
+FILE: backend\Qubriq.API\Controllers\LoadOptimizationController.cs
+================================================================================
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Qubriq.API.Data;
+using Qubriq.API.DTOs.LoadOptimization;
+using Qubriq.API.Services.LoadOptimization;
+
+namespace Qubriq.API.Controllers;
+
+[ApiController]
+[Route("api/load-optimization")]
+[Authorize(Roles = "Admin,OperationsDispatcher")]
+public sealed class LoadOptimizationController : ControllerBase
+{
+    private const string RequiredPermission = "fleet.load_optimization.run";
+
+    private readonly QubriqDbContext _db;
+    private readonly ILoadOptimizationService _optimizationService;
+
+    public LoadOptimizationController(
+        QubriqDbContext db,
+        ILoadOptimizationService optimizationService)
+    {
+        _db = db;
+        _optimizationService = optimizationService;
+    }
+
+    private long? UserId()
+    {
+        var value = User.FindFirst("sub")?.Value
+            ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        return long.TryParse(value, out var id) ? id : null;
+    }
+
+    private async Task<bool> Allowed()
+    {
+        var id = UserId();
+
+        if (!id.HasValue)
+            return false;
+
+        var activeUser = await _db.Users
+            .AnyAsync(x => x.Id == id.Value && x.IsActive);
+
+        if (!activeUser)
+            return false;
+
+        return await _db.UserRoles
+            .Where(x => x.UserId == id.Value)
+            .Join(
+                _db.RolePermissions,
+                userRole => userRole.RoleId,
+                rolePermission => rolePermission.RoleId,
+                (_, rolePermission) => rolePermission)
+            .AnyAsync(x =>
+                x.IsAllowed &&
+                x.Permission.Code == RequiredPermission);
+    }
+
+    [HttpPost("optimize")]
+    public async Task<IActionResult> Optimize(
+        [FromBody] LoadOptimizationRequest request)
+    {
+        if (!await Allowed())
+            return Forbid();
+
+        try
+        {
+            var result = _optimizationService.Optimize(request);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new
+            {
+                message = ex.Message
+            });
+        }
+    }
+}
+
+EXISTING MIGRATION FILES
+20261123172349_InitialDatabaseSchema.cs
+20261123172349_InitialDatabaseSchema.Designer.cs
+20261123182313_AddBookingDetails.cs
+20261123182313_AddBookingDetails.Designer.cs
+20261124054938_AddHybridRbacAndRecipientAccess.cs
+20261124054938_AddHybridRbacAndRecipientAccess.Designer.cs
+QubriqDbContextModelSnapshot.cs
+
+MODEL SNAPSHOT SUMMARY
+22: modelBuilder.Entity("Qubriq.API.Models.AuditLog", b =>
+26: .HasColumnType("bigint");
+31: .HasColumnType("varchar(120)");
+34: .HasColumnType("datetime(6)");
+37: .HasColumnType("longtext");
+41: .HasColumnType("varchar(100)");
+46: .HasColumnType("varchar(100)");
+49: .HasColumnType("bigint");
+53: b.HasIndex("CreatedAtUtc");
+55: b.HasIndex("UserId");
+57: b.HasIndex("EntityType", "EntityId");
+59: b.ToTable("AuditLogs", (string)null);
+62: modelBuilder.Entity("Qubriq.API.Models.Customer", b =>
+66: .HasColumnType("bigint");
+70: .HasColumnType("varchar(500)");
+75: .HasColumnType("varchar(200)");
+79: .HasColumnType("varchar(150)");
+82: .HasColumnType("datetime(6)");
+86: .HasColumnType("varchar(254)");
+89: .HasColumnType("tinyint(1)");
+93: .HasColumnType("varchar(30)");
+96: .HasColumnType("bigint");
+100: b.HasIndex("UserId")
+103: b.ToTable("Customers", (string)null);
+106: modelBuilder.Entity("Qubriq.API.Models.DeliveryProof", b =>
+110: .HasColumnType("bigint");
+114: .HasColumnType("varchar(500)");
+119: .HasColumnType("varchar(50)");
+123: .HasColumnType("varchar(1000)");
+126: .HasColumnType("bigint");
+129: .HasColumnType("datetime(6)");
+132: .HasColumnType("bigint");
+136: b.HasIndex("ShipmentId");
+138: b.HasIndex("SubmittedByUserId");
+140: b.ToTable("DeliveryProofs", (string)null);
+143: modelBuilder.Entity("Qubriq.API.Models.Driver", b =>
+147: .HasColumnType("bigint");
+152: .HasColumnType("varchar(150)");
+157: .HasColumnType("varchar(60)");
+161: .HasColumnType("varchar(30)");
+166: .HasColumnType("varchar(40)");
+169: .HasColumnType("bigint");
+173: b.HasIndex("LicenseNumber")
+176: b.HasIndex("UserId")
+179: b.ToTable("Drivers", (string)null);
+182: modelBuilder.Entity("Qubriq.API.Models.ExternalLogin", b =>
+186: .HasColumnType("bigint");
+189: .HasColumnType("datetime(6)");
+194: .HasColumnType("varchar(50)");
+199: .HasColumnType("varchar(255)");
+202: .HasColumnType("bigint");
+206: b.HasIndex("UserId");
+208: b.HasIndex("Provider", "ProviderSubject")
+211: b.ToTable("ExternalLogins", (string)null);
+214: modelBuilder.Entity("Qubriq.API.Models.Permission", b =>
+218: .HasColumnType("bigint");
+223: .HasColumnType("varchar(80)");
+228: .HasColumnType("varchar(120)");
+232: .HasColumnType("varchar(300)");
+237: .HasColumnType("varchar(80)");
+241: b.HasIndex("Code")
+244: b.ToTable("Permissions", (string)null);
+247: modelBuilder.Entity("Qubriq.API.Models.Role", b =>
+251: .HasColumnType("bigint");
+255: .HasColumnType("varchar(250)");
+260: .HasColumnType("varchar(60)");
+264: b.HasIndex("Name")
+267: b.ToTable("Roles", (string)null);
+270: modelBuilder.Entity("Qubriq.API.Models.RolePermission", b =>
+273: .HasColumnType("bigint");
+276: .HasColumnType("bigint");
+279: .HasColumnType("datetime(6)");
+282: .HasColumnType("tinyint(1)");
+286: b.HasIndex("PermissionId");
+288: b.ToTable("RolePermissions", (string)null);
+291: modelBuilder.Entity("Qubriq.API.Models.Shipment", b =>
+295: .HasColumnType("bigint");
+299: .HasColumnType("varchar(1000)");
+303: .HasColumnType("varchar(100)");
+307: .HasColumnType("varchar(200)");
+310: .HasColumnType("datetime(6)");
+313: .HasColumnType("bigint");
+317: .HasColumnType("varchar(100)");
+322: .HasColumnType("varchar(250)");
+325: .HasColumnType("datetime(6)");
+328: .HasPrecision(12, 2)
+329: .HasColumnType("decimal(12,2)");
+332: .HasColumnType("tinyint(1)");
+335: .HasPrecision(12, 2)
+336: .HasColumnType("decimal(12,2)");
+341: .HasColumnType("varchar(250)");
+344: .HasColumnType("int");
+347: .HasColumnType("datetime(6)");
+351: .HasColumnType("varchar(20)");
+355: .HasColumnType("varchar(500)");
+360: .HasColumnType("varchar(40)");
+363: .HasPrecision(12, 2)
+364: .HasColumnType("decimal(12,2)");
+369: .HasColumnType("varchar(60)");
+372: .HasPrecision(12, 2)
+373: .HasColumnType("decimal(12,2)");
+377: b.HasIndex("CustomerId");
+379: b.HasIndex("TrackingNumber")
+382: b.ToTable("Shipments", (string)null);
+385: modelBuilder.Entity("Qubriq.API.Models.ShipmentAssignment", b =>
+389: .HasColumnType("bigint");
+392: .HasColumnType("datetime(6)");
+395: .HasColumnType("bigint");
+398: .HasColumnType("datetime(6)");
+401: .HasColumnType("bigint");
+406: .HasColumnType("varchar(40)");
+409: .HasColumnType("bigint");
+413: b.HasIndex("DriverId");
+415: b.HasIndex("ShipmentId");
+417: b.HasIndex("VehicleId");
+419: b.ToTable("ShipmentAssignments", (string)null);
+422: modelBuilder.Entity("Qubriq.API.Models.ShipmentRecipient", b =>
+426: .HasColumnType("bigint");
+429: .HasColumnType("datetime(6)");
+432: .HasColumnType("bigint");
+435: .HasColumnType("bigint");
+439: b.HasIndex("UserId");
+441: b.HasIndex("ShipmentId", "UserId")
+444: b.ToTable("ShipmentRecipients", (string)null);
+447: modelBuilder.Entity("Qubriq.API.Models.User", b =>
+451: .HasColumnType("bigint");
+454: .HasColumnType("datetime(6)");
+459: .HasColumnType("varchar(254)");
+462: .HasColumnType("tinyint(1)");
+467: .HasColumnType("varchar(150)");
+470: .HasColumnType("tinyint(1)");
+473: .HasColumnType("datetime(6)");
+477: .HasColumnType("varchar(500)");
+481: .HasColumnType("varchar(30)");
+484: .HasColumnType("datetime(6)");
+488: b.HasIndex("Email")
+491: b.ToTable("Users", (string)null);
+494: modelBuilder.Entity("Qubriq.API.Models.UserRole", b =>
+497: .HasColumnType("bigint");
+500: .HasColumnType("bigint");
+503: .HasColumnType("datetime(6)");
+507: b.HasIndex("RoleId");
+509: b.ToTable("UserRoles", (string)null);
+512: modelBuilder.Entity("Qubriq.API.Models.Vehicle", b =>
+516: .HasColumnType("bigint");
+519: .HasColumnType("decimal(12,2)");
+524: .HasColumnType("varchar(30)");
+529: .HasColumnType("varchar(40)");
+534: .HasColumnType("varchar(80)");
+538: b.HasIndex("RegistrationNumber")
+541: b.ToTable("Vehicles", (string)null);
+544: modelBuilder.Entity("Qubriq.API.Models.AuditLog", b =>
+548: .HasForeignKey("UserId")
+549: .OnDelete(DeleteBehavior.SetNull);
+554: modelBuilder.Entity("Qubriq.API.Models.Customer", b =>
+558: .HasForeignKey("Qubriq.API.Models.Customer", "UserId")
+559: .OnDelete(DeleteBehavior.Restrict);
+564: modelBuilder.Entity("Qubriq.API.Models.DeliveryProof", b =>
+568: .HasForeignKey("ShipmentId")
+569: .OnDelete(DeleteBehavior.Restrict)
+574: .HasForeignKey("SubmittedByUserId")
+575: .OnDelete(DeleteBehavior.Restrict)
+583: modelBuilder.Entity("Qubriq.API.Models.Driver", b =>
+587: .HasForeignKey("Qubriq.API.Models.Driver", "UserId")
+588: .OnDelete(DeleteBehavior.Restrict);
+593: modelBuilder.Entity("Qubriq.API.Models.ExternalLogin", b =>
+597: .HasForeignKey("UserId")
+598: .OnDelete(DeleteBehavior.Restrict)
+604: modelBuilder.Entity("Qubriq.API.Models.RolePermission", b =>
+608: .HasForeignKey("PermissionId")
+609: .OnDelete(DeleteBehavior.Restrict)
+614: .HasForeignKey("RoleId")
+615: .OnDelete(DeleteBehavior.Cascade)
+623: modelBuilder.Entity("Qubriq.API.Models.Shipment", b =>
+627: .HasForeignKey("CustomerId")
+628: .OnDelete(DeleteBehavior.Restrict)
+634: modelBuilder.Entity("Qubriq.API.Models.ShipmentAssignment", b =>
+638: .HasForeignKey("DriverId")
+639: .OnDelete(DeleteBehavior.Restrict)
+644: .HasForeignKey("ShipmentId")
+645: .OnDelete(DeleteBehavior.Restrict)
+650: .HasForeignKey("VehicleId")
+651: .OnDelete(DeleteBehavior.Restrict)
+661: modelBuilder.Entity("Qubriq.API.Models.ShipmentRecipient", b =>
+665: .HasForeignKey("ShipmentId")
+666: .OnDelete(DeleteBehavior.Restrict)
+671: .HasForeignKey("UserId")
+672: .OnDelete(DeleteBehavior.Restrict)
+680: modelBuilder.Entity("Qubriq.API.Models.UserRole", b =>
+684: .HasForeignKey("RoleId")
+685: .OnDelete(DeleteBehavior.Restrict)
+690: .HasForeignKey("UserId")
+691: .OnDelete(DeleteBehavior.Cascade)
+699: modelBuilder.Entity("Qubriq.API.Models.Customer", b =>
+704: modelBuilder.Entity("Qubriq.API.Models.Driver", b =>
+709: modelBuilder.Entity("Qubriq.API.Models.Permission", b =>
+714: modelBuilder.Entity("Qubriq.API.Models.Role", b =>
+721: modelBuilder.Entity("Qubriq.API.Models.Shipment", b =>
+726: modelBuilder.Entity("Qubriq.API.Models.User", b =>
+743: modelBuilder.Entity("Qubriq.API.Models.Vehicle", b =>

@@ -1,0 +1,1050 @@
+﻿QUBRIQ STAGE 2 - REMAINING SOURCE INSPECTION
+
+
+==========================================================================================
+FILE: backend\Qubriq.API\DTOs\LoadOptimization\LoadOptimizationRequest.cs
+==========================================================================================
+    1: using System.ComponentModel.DataAnnotations;
+    2: 
+    3: namespace Qubriq.API.DTOs.LoadOptimization;
+    4: 
+    5: public sealed class LoadOptimizationRequest
+    6: {
+    7:     [Required]
+    8:     [Range(typeof(decimal), "1", "100000")]
+    9:     public decimal VehicleLengthCm { get; set; }
+   10: 
+   11:     [Required]
+   12:     [Range(typeof(decimal), "1", "100000")]
+   13:     public decimal VehicleWidthCm { get; set; }
+   14: 
+   15:     [Required]
+   16:     [Range(typeof(decimal), "1", "100000")]
+   17:     public decimal VehicleHeightCm { get; set; }
+   18: 
+   19:     [Required]
+   20:     [Range(typeof(decimal), "0.01", "100000000")]
+   21:     public decimal MaxPayloadKg { get; set; }
+   22: 
+   23:     [Required]
+   24:     [MinLength(1)]
+   25:     public List<PackageInputDto> Packages { get; set; } = new();
+   26: }
+   27: 
+   28: public sealed class PackageInputDto
+   29: {
+   30:     [Required]
+   31:     [StringLength(80, MinimumLength = 1)]
+   32:     public string PackageId { get; set; } = string.Empty;
+   33: 
+   34:     [StringLength(150)]
+   35:     public string? Description { get; set; }
+   36: 
+   37:     [Range(typeof(decimal), "0.1", "100000")]
+   38:     public decimal LengthCm { get; set; }
+   39: 
+   40:     [Range(typeof(decimal), "0.1", "100000")]
+   41:     public decimal WidthCm { get; set; }
+   42: 
+   43:     [Range(typeof(decimal), "0.1", "100000")]
+   44:     public decimal HeightCm { get; set; }
+   45: 
+   46:     [Range(typeof(decimal), "0.01", "1000000")]
+   47:     public decimal WeightKg { get; set; }
+   48: 
+   49:     [Range(1, 200)]
+   50:     public int Quantity { get; set; } = 1;
+   51: 
+   52:     public bool IsFragile { get; set; }
+   53: }
+
+TOTAL LINES: 53
+
+
+==========================================================================================
+FILE: backend\Qubriq.API\DTOs\LoadOptimization\LoadOptimizationResponse.cs
+==========================================================================================
+    1: namespace Qubriq.API.DTOs.LoadOptimization;
+    2: 
+    3: public sealed class LoadOptimizationResponse
+    4: {
+    5:     public string Algorithm { get; set; } = "ExtremePoint3D-Heuristic";
+    6: 
+    7:     public bool IsFeasible { get; set; }
+    8: 
+    9:     public string Status { get; set; } = string.Empty;
+   10: 
+   11:     public VehicleSpaceDto Vehicle { get; set; } = new();
+   12: 
+   13:     public int TotalPackages { get; set; }
+   14: 
+   15:     public int PlacedPackages { get; set; }
+   16: 
+   17:     public int UnplacedPackages { get; set; }
+   18: 
+   19:     public decimal TotalCargoWeightKg { get; set; }
+   20: 
+   21:     public decimal PlacedCargoWeightKg { get; set; }
+   22: 
+   23:     public decimal RemainingPayloadKg { get; set; }
+   24: 
+   25:     public decimal VolumeUtilizationPercent { get; set; }
+   26: 
+   27:     public decimal PayloadUtilizationPercent { get; set; }
+   28: 
+   29:     public List<PackagePlacementDto> Placements { get; set; } = new();
+   30: 
+   31:     public List<UnplacedPackageDto> UnplacedItems { get; set; } = new();
+   32: 
+   33:     public List<string> Warnings { get; set; } = new();
+   34: }
+   35: 
+   36: public sealed class VehicleSpaceDto
+   37: {
+   38:     public decimal LengthCm { get; set; }
+   39: 
+   40:     public decimal WidthCm { get; set; }
+   41: 
+   42:     public decimal HeightCm { get; set; }
+   43: 
+   44:     public decimal MaxPayloadKg { get; set; }
+   45: 
+   46:     public decimal UsedVolumeCm3 { get; set; }
+   47: 
+   48:     public decimal TotalVolumeCm3 { get; set; }
+   49: }
+   50: 
+   51: public sealed class PackagePlacementDto
+   52: {
+   53:     public string PackageId { get; set; } = string.Empty;
+   54: 
+   55:     public string? Description { get; set; }
+   56: 
+   57:     public int UnitNumber { get; set; }
+   58: 
+   59:     public decimal X { get; set; }
+   60: 
+   61:     public decimal Y { get; set; }
+   62: 
+   63:     public decimal Z { get; set; }
+   64: 
+   65:     public decimal LengthCm { get; set; }
+   66: 
+   67:     public decimal WidthCm { get; set; }
+   68: 
+   69:     public decimal HeightCm { get; set; }
+   70: 
+   71:     public decimal WeightKg { get; set; }
+   72: 
+   73:     public bool IsFragile { get; set; }
+   74: 
+   75:     public string Orientation { get; set; } = string.Empty;
+   76: }
+   77: 
+   78: public sealed class UnplacedPackageDto
+   79: {
+   80:     public string PackageId { get; set; } = string.Empty;
+   81: 
+   82:     public string? Description { get; set; }
+   83: 
+   84:     public int UnitNumber { get; set; }
+   85: 
+   86:     public decimal WeightKg { get; set; }
+   87: 
+   88:     public string Reason { get; set; } = string.Empty;
+   89: }
+
+TOTAL LINES: 89
+
+
+==========================================================================================
+FILE: backend\Qubriq.API\Services\LoadOptimization\LoadOptimizationService.cs
+==========================================================================================
+    1: using Qubriq.API.DTOs.LoadOptimization;
+    2: 
+    3: namespace Qubriq.API.Services.LoadOptimization;
+    4: 
+    5: public interface ILoadOptimizationService
+    6: {
+    7:     LoadOptimizationResponse Optimize(LoadOptimizationRequest request);
+    8: }
+    9: 
+   10: public sealed class LoadOptimizationService : ILoadOptimizationService
+   11: {
+   12:     private const decimal SupportThreshold = 0.80m;
+   13:     private const decimal Epsilon = 0.0001m;
+   14: 
+   15:     private sealed class Box
+   16:     {
+   17:         public string PackageId { get; init; } = "";
+   18:         public string? Description { get; init; }
+   19:         public int UnitNumber { get; init; }
+   20:         public decimal X { get; init; }
+   21:         public decimal Y { get; init; }
+   22:         public decimal Z { get; init; }
+   23:         public decimal Length { get; init; }
+   24:         public decimal Width { get; init; }
+   25:         public decimal Height { get; init; }
+   26:         public decimal Weight { get; init; }
+   27:         public bool IsFragile { get; init; }
+   28: 
+   29:         public decimal Right => X + Length;
+   30:         public decimal Back => Y + Width;
+   31:         public decimal Top => Z + Height;
+   32:         public decimal Volume => Length * Width * Height;
+   33:     }
+   34: 
+   35:     private sealed class Unit
+   36:     {
+   37:         public PackageInputDto Package { get; init; } = new();
+   38:         public int UnitNumber { get; init; }
+   39:     }
+   40: 
+   41:     private readonly record struct Point(decimal X, decimal Y, decimal Z);
+   42: 
+   43:     private sealed class Orientation
+   44:     {
+   45:         public decimal Length { get; init; }
+   46:         public decimal Width { get; init; }
+   47:         public decimal Height { get; init; }
+   48:         public string Name { get; init; } = "";
+   49:     }
+   50: 
+   51:     public LoadOptimizationResponse Optimize(LoadOptimizationRequest request)
+   52:     {
+   53:         ArgumentNullException.ThrowIfNull(request);
+   54: 
+   55:         ValidateRequest(request);
+   56: 
+   57:         var units = request.Packages
+   58:             .SelectMany(package =>
+   59:                 Enumerable.Range(1, package.Quantity)
+   60:                     .Select(number => new Unit
+   61:                     {
+   62:                         Package = package,
+   63:                         UnitNumber = number
+   64:                     }))
+   65:             .OrderByDescending(x =>
+   66:                 x.Package.LengthCm * x.Package.WidthCm * x.Package.HeightCm)
+   67:             .ThenByDescending(x => x.Package.WeightKg)
+   68:             .ToList();
+   69: 
+   70:         var totalWeight = units.Sum(x => x.Package.WeightKg);
+   71:         var vehicleVolume =
+   72:             request.VehicleLengthCm *
+   73:             request.VehicleWidthCm *
+   74:             request.VehicleHeightCm;
+   75: 
+   76:         var placements = new List<Box>();
+   77:         var unplaced = new List<UnplacedPackageDto>();
+   78:         var points = new List<Point> { new(0, 0, 0) };
+   79: 
+   80:         decimal placedWeight = 0;
+   81: 
+   82:         foreach (var unit in units)
+   83:         {
+   84:             var package = unit.Package;
+   85: 
+   86:             if (package.WeightKg > request.MaxPayloadKg)
+   87:             {
+   88:                 AddUnplaced(
+   89:                     unplaced,
+   90:                     unit,
+   91:                     "Package weight exceeds the vehicle's maximum payload.");
+   92: 
+   93:                 continue;
+   94:             }
+   95: 
+   96:             if (placedWeight + package.WeightKg > request.MaxPayloadKg)
+   97:             {
+   98:                 AddUnplaced(
+   99:                     unplaced,
+  100:                     unit,
+  101:                     "Insufficient remaining vehicle payload capacity.");
+  102: 
+  103:                 continue;
+  104:             }
+  105: 
+  106:             var orientations = GetOrientations(package);
+  107:             Box? selected = null;
+  108:             Point selectedPoint = default;
+  109:             Orientation? selectedOrientation = null;
+  110: 
+  111:             var orderedPoints = points
+  112:                 .Distinct()
+  113:                 .OrderBy(p => p.Z)
+  114:                 .ThenBy(p => p.Y)
+  115:                 .ThenBy(p => p.X)
+  116:                 .ToList();
+  117: 
+  118:             foreach (var point in orderedPoints)
+  119:             {
+  120:                 foreach (var orientation in orientations)
+  121:                 {
+  122:                     var candidate = new Box
+  123:                     {
+  124:                         PackageId = package.PackageId,
+  125:                         Description = package.Description,
+  126:                         UnitNumber = unit.UnitNumber,
+  127:                         X = point.X,
+  128:                         Y = point.Y,
+  129:                         Z = point.Z,
+  130:                         Length = orientation.Length,
+  131:                         Width = orientation.Width,
+  132:                         Height = orientation.Height,
+  133:                         Weight = package.WeightKg,
+  134:                         IsFragile = package.IsFragile
+  135:                     };
+  136: 
+  137:                     if (!InsideVehicle(candidate, request))
+  138:                         continue;
+  139: 
+  140:                     if (placements.Any(existing =>
+  141:                         Intersects(candidate, existing)))
+  142:                         continue;
+  143: 
+  144:                     if (!HasStableSupport(candidate, placements))
+  145:                         continue;
+  146: 
+  147:                     if (WouldLoadOnFragile(candidate, placements))
+  148:                         continue;
+  149: 
+  150:                     selected = candidate;
+  151:                     selectedPoint = point;
+  152:                     selectedOrientation = orientation;
+  153:                     break;
+  154:                 }
+  155: 
+  156:                 if (selected != null)
+  157:                     break;
+  158:             }
+  159: 
+  160:             if (selected == null || selectedOrientation == null)
+  161:             {
+  162:                 AddUnplaced(
+  163:                     unplaced,
+  164:                     unit,
+  165:                     "No valid position found within the vehicle space and placement constraints.");
+  166: 
+  167:                 continue;
+  168:             }
+  169: 
+  170:             placements.Add(selected);
+  171:             placedWeight += selected.Weight;
+  172: 
+  173:             AddPoint(points, new Point(
+  174:                 selected.Right, selected.Y, selected.Z));
+  175: 
+  176:             AddPoint(points, new Point(
+  177:                 selected.X, selected.Back, selected.Z));
+  178: 
+  179:             AddPoint(points, new Point(
+  180:                 selected.X, selected.Y, selected.Top));
+  181:         }
+  182: 
+  183:         var usedVolume = placements.Sum(x => x.Volume);
+  184: 
+  185:         var volumeUtilization = vehicleVolume > 0
+  186:             ? usedVolume / vehicleVolume * 100m
+  187:             : 0m;
+  188: 
+  189:         var payloadUtilization = request.MaxPayloadKg > 0
+  190:             ? placedWeight / request.MaxPayloadKg * 100m
+  191:             : 0m;
+  192: 
+  193:         var isFeasible = unplaced.Count == 0;
+  194: 
+  195:         var response = new LoadOptimizationResponse
+  196:         {
+  197:             IsFeasible = isFeasible,
+  198:             Status = isFeasible
+  199:                 ? "All packages placed"
+  200:                 : placements.Count == 0
+  201:                     ? "No packages could be placed"
+  202:                     : "Partial loading",
+  203: 
+  204:             Vehicle = new VehicleSpaceDto
+  205:             {
+  206:                 LengthCm = request.VehicleLengthCm,
+  207:                 WidthCm = request.VehicleWidthCm,
+  208:                 HeightCm = request.VehicleHeightCm,
+  209:                 MaxPayloadKg = request.MaxPayloadKg,
+  210:                 UsedVolumeCm3 = Round(usedVolume),
+  211:                 TotalVolumeCm3 = Round(vehicleVolume)
+  212:             },
+  213: 
+  214:             TotalPackages = units.Count,
+  215:             PlacedPackages = placements.Count,
+  216:             UnplacedPackages = unplaced.Count,
+  217: 
+  218:             TotalCargoWeightKg = Round(totalWeight),
+  219:             PlacedCargoWeightKg = Round(placedWeight),
+  220:             RemainingPayloadKg = Round(
+  221:                 request.MaxPayloadKg - placedWeight),
+  222: 
+  223:             VolumeUtilizationPercent = Round(volumeUtilization),
+  224:             PayloadUtilizationPercent = Round(payloadUtilization),
+  225: 
+  226:             Placements = placements.Select(box =>
+  227:             {
+  228:                 var orientation = GetOrientations(
+  229:                     units.First(x =>
+  230:                         x.Package.PackageId == box.PackageId &&
+  231:                         x.UnitNumber == box.UnitNumber).Package)
+  232:                     .First(x =>
+  233:                         x.Length == box.Length &&
+  234:                         x.Width == box.Width &&
+  235:                         x.Height == box.Height);
+  236: 
+  237:                 return new PackagePlacementDto
+  238:                 {
+  239:                     PackageId = box.PackageId,
+  240:                     Description = box.Description,
+  241:                     UnitNumber = box.UnitNumber,
+  242:                     X = Round(box.X),
+  243:                     Y = Round(box.Y),
+  244:                     Z = Round(box.Z),
+  245:                     LengthCm = Round(box.Length),
+  246:                     WidthCm = Round(box.Width),
+  247:                     HeightCm = Round(box.Height),
+  248:                     WeightKg = Round(box.Weight),
+  249:                     IsFragile = box.IsFragile,
+  250:                     Orientation = orientation.Name
+  251:                 };
+  252:             }).ToList(),
+  253: 
+  254:             UnplacedItems = unplaced,
+  255: 
+  256:             Warnings = new List<string>
+  257:             {
+  258:                 "This is a heuristic packing result, not a guaranteed global optimum.",
+  259:                 "Package coordinates use centimetres. X = vehicle length, Y = vehicle width, Z = vertical height.",
+  260:                 "The support rule requires at least 80% of a raised package's bottom footprint to be supported.",
+  261:                 "This initial version does not model axle loads, vehicle suspension, tie-downs or unloading sequence."
+  262:             }
+  263:         };
+  264: 
+  265:         return response;
+  266:     }
+  267: 
+  268:     private static void ValidateRequest(LoadOptimizationRequest request)
+  269:     {
+  270:         if (request.VehicleLengthCm <= 0 ||
+  271:             request.VehicleWidthCm <= 0 ||
+  272:             request.VehicleHeightCm <= 0 ||
+  273:             request.MaxPayloadKg <= 0)
+  274:         {
+  275:             throw new ArgumentException(
+  276:                 "Vehicle dimensions and maximum payload must be positive.");
+  277:         }
+  278: 
+  279:         if (request.Packages == null || request.Packages.Count == 0)
+  280:         {
+  281:             throw new ArgumentException(
+  282:                 "At least one package is required.");
+  283:         }
+  284: 
+  285:         var totalUnits = 0;
+  286:         var packageIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+  287: 
+  288:         foreach (var package in request.Packages)
+  289:         {
+  290:             if (string.IsNullOrWhiteSpace(package.PackageId))
+  291:                 throw new ArgumentException("Every package requires a PackageId.");
+  292: 
+  293:             if (!packageIds.Add(package.PackageId.Trim()))
+  294:                 throw new ArgumentException(
+  295:                     $"Duplicate PackageId '{package.PackageId}'. Each package group must have a unique ID.");
+  296: 
+  297:             if (package.LengthCm <= 0 ||
+  298:                 package.WidthCm <= 0 ||
+  299:                 package.HeightCm <= 0 ||
+  300:                 package.WeightKg <= 0)
+  301:             {
+  302:                 throw new ArgumentException(
+  303:                     $"Package '{package.PackageId}' has invalid dimensions or weight.");
+  304:             }
+  305: 
+  306:             if (package.Quantity < 1 || package.Quantity > 200)
+  307:                 throw new ArgumentException(
+  308:                     $"Package '{package.PackageId}' has an invalid quantity.");
+  309: 
+  310:             totalUnits += package.Quantity;
+  311:         }
+  312: 
+  313:         if (totalUnits > 1000)
+  314:         {
+  315:             throw new ArgumentException(
+  316:                 "A maximum of 1000 package units is allowed per optimization request.");
+  317:         }
+  318:     }
+  319: 
+  320:     private static List<Orientation> GetOrientations(
+  321:         PackageInputDto package)
+  322:     {
+  323:         var dimensions = new[]
+  324:         {
+  325:             (package.LengthCm, package.WidthCm, package.HeightCm, "L-W-H"),
+  326:             (package.LengthCm, package.HeightCm, package.WidthCm, "L-H-W"),
+  327:             (package.WidthCm, package.LengthCm, package.HeightCm, "W-L-H"),
+  328:             (package.WidthCm, package.HeightCm, package.LengthCm, "W-H-L"),
+  329:             (package.HeightCm, package.LengthCm, package.WidthCm, "H-L-W"),
+  330:             (package.HeightCm, package.WidthCm, package.LengthCm, "H-W-L")
+  331:         };
+  332: 
+  333:         return dimensions
+  334:             .Select(x => new Orientation
+  335:             {
+  336:                 Length = x.Item1,
+  337:                 Width = x.Item2,
+  338:                 Height = x.Item3,
+  339:                 Name = x.Item4
+  340:             })
+  341:             .GroupBy(x => (x.Length, x.Width, x.Height))
+  342:             .Select(x => x.First())
+  343:             .ToList();
+  344:     }
+  345: 
+  346:     private static bool InsideVehicle(
+  347:         Box box,
+  348:         LoadOptimizationRequest request)
+  349:     {
+  350:         return box.X >= 0 &&
+  351:                box.Y >= 0 &&
+  352:                box.Z >= 0 &&
+  353:                box.Right <= request.VehicleLengthCm + Epsilon &&
+  354:                box.Back <= request.VehicleWidthCm + Epsilon &&
+  355:                box.Top <= request.VehicleHeightCm + Epsilon;
+  356:     }
+  357: 
+  358:     private static bool Intersects(Box a, Box b)
+  359:     {
+  360:         return a.X < b.Right - Epsilon &&
+  361:                a.Right > b.X + Epsilon &&
+  362:                a.Y < b.Back - Epsilon &&
+  363:                a.Back > b.Y + Epsilon &&
+  364:                a.Z < b.Top - Epsilon &&
+  365:                a.Top > b.Z + Epsilon;
+  366:     }
+  367: 
+  368:     private static bool HasStableSupport(
+  369:         Box candidate,
+  370:         List<Box> placements)
+  371:     {
+  372:         if (candidate.Z <= Epsilon)
+  373:             return true;
+  374: 
+  375:         var footprintArea = candidate.Length * candidate.Width;
+  376:         if (footprintArea <= 0)
+  377:             return false;
+  378: 
+  379:         decimal supportedArea = 0;
+  380: 
+  381:         foreach (var support in placements)
+  382:         {
+  383:             if (Math.Abs(support.Top - candidate.Z) > Epsilon)
+  384:                 continue;
+  385: 
+  386:             var overlapLength = Math.Max(
+  387:                 0,
+  388:                 Math.Min(candidate.Right, support.Right) -
+  389:                 Math.Max(candidate.X, support.X));
+  390: 
+  391:             var overlapWidth = Math.Max(
+  392:                 0,
+  393:                 Math.Min(candidate.Back, support.Back) -
+  394:                 Math.Max(candidate.Y, support.Y));
+  395: 
+  396:             supportedArea += overlapLength * overlapWidth;
+  397:         }
+  398: 
+  399:         return supportedArea / footprintArea >= SupportThreshold;
+  400:     }
+  401: 
+  402:     private static bool WouldLoadOnFragile(
+  403:         Box candidate,
+  404:         List<Box> placements)
+  405:     {
+  406:         return placements.Any(existing =>
+  407:             existing.IsFragile &&
+  408:             Math.Abs(existing.Top - candidate.Z) <= Epsilon &&
+  409:             candidate.X < existing.Right - Epsilon &&
+  410:             candidate.Right > existing.X + Epsilon &&
+  411:             candidate.Y < existing.Back - Epsilon &&
+  412:             candidate.Back > existing.Y + Epsilon);
+  413:     }
+  414: 
+  415:     private static void AddPoint(List<Point> points, Point point)
+  416:     {
+  417:         if (point.X < 0 || point.Y < 0 || point.Z < 0)
+  418:             return;
+  419: 
+  420:         if (!points.Contains(point))
+  421:             points.Add(point);
+  422:     }
+  423: 
+  424:     private static void AddUnplaced(
+  425:         List<UnplacedPackageDto> unplaced,
+  426:         Unit unit,
+  427:         string reason)
+  428:     {
+  429:         unplaced.Add(new UnplacedPackageDto
+  430:         {
+  431:             PackageId = unit.Package.PackageId,
+  432:             Description = unit.Package.Description,
+  433:             UnitNumber = unit.UnitNumber,
+  434:             WeightKg = unit.Package.WeightKg,
+  435:             Reason = reason
+  436:         });
+  437:     }
+  438: 
+  439:     private static decimal Round(decimal value)
+  440:     {
+  441:         return Math.Round(value, 2, MidpointRounding.AwayFromZero);
+  442:     }
+  443: }
+  444: 
+
+TOTAL LINES: 444
+
+
+==========================================================================================
+FILE: backend\Qubriq.API\Data\QubriqDbContext.cs
+==========================================================================================
+    1: using Microsoft.EntityFrameworkCore;
+    2: using Qubriq.API.Models;
+    3: 
+    4: namespace Qubriq.API.Data;
+    5: 
+    6: public class QubriqDbContext : DbContext
+    7: {
+    8:     public QubriqDbContext(DbContextOptions<QubriqDbContext> options)
+    9:         : base(options)
+   10:     {
+   11:     }
+   12: 
+   13:     public DbSet<User> Users => Set<User>();
+   14:     public DbSet<Role> Roles => Set<Role>();
+   15:     public DbSet<UserRole> UserRoles => Set<UserRole>();
+   16:     public DbSet<Permission> Permissions => Set<Permission>();
+   17:     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+   18:     public DbSet<ExternalLogin> ExternalLogins => Set<ExternalLogin>();
+   19:     public DbSet<Customer> Customers => Set<Customer>();
+   20:     public DbSet<Shipment> Shipments => Set<Shipment>();
+   21:     public DbSet<Vehicle> Vehicles => Set<Vehicle>();
+   22:     public DbSet<Driver> Drivers => Set<Driver>();
+   23:     public DbSet<ShipmentAssignment> ShipmentAssignments => Set<ShipmentAssignment>();
+   24:     public DbSet<ShipmentRecipient> ShipmentRecipients => Set<ShipmentRecipient>();
+   25:     public DbSet<DeliveryProof> DeliveryProofs => Set<DeliveryProof>();
+   26:     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+   27: 
+   28:     protected override void OnModelCreating(ModelBuilder modelBuilder)
+   29:     {
+   30:         base.OnModelCreating(modelBuilder);
+   31: 
+   32:         // ==========================================
+   33:         // USERS
+   34:         // ==========================================
+   35: 
+   36:         modelBuilder.Entity<User>(entity =>
+   37:         {
+   38:             entity.ToTable("Users");
+   39:             entity.HasKey(x => x.Id);
+   40: 
+   41:             entity.Property(x => x.FullName)
+   42:                 .HasMaxLength(150)
+   43:                 .IsRequired();
+   44: 
+   45:             entity.Property(x => x.Email)
+   46:                 .HasMaxLength(254)
+   47:                 .IsRequired();
+   48: 
+   49:             entity.Property(x => x.PasswordHash)
+   50:                 .HasMaxLength(500)
+   51:                 .IsRequired(false);
+   52: 
+   53:             entity.Property(x => x.RecipientType)
+   54:                 .HasMaxLength(30);
+   55: 
+   56:             entity.HasIndex(x => x.Email).IsUnique();
+   57: 
+   58:             entity.HasOne(x => x.Customer)
+   59:                 .WithOne(x => x.User)
+   60:                 .HasForeignKey<Customer>(x => x.UserId)
+   61:                 .OnDelete(DeleteBehavior.Restrict);
+   62: 
+   63:             entity.HasOne(x => x.Driver)
+   64:                 .WithOne(x => x.User)
+   65:                 .HasForeignKey<Driver>(x => x.UserId)
+   66:                 .OnDelete(DeleteBehavior.Restrict);
+   67:         });
+   68: 
+   69:         // ==========================================
+   70:         // ROLES
+   71:         // ==========================================
+   72: 
+   73:         modelBuilder.Entity<Role>(entity =>
+   74:         {
+   75:             entity.ToTable("Roles");
+   76:             entity.HasKey(x => x.Id);
+   77: 
+   78:             entity.Property(x => x.Name)
+   79:                 .HasMaxLength(60)
+   80:                 .IsRequired();
+   81: 
+   82:             entity.Property(x => x.Description)
+   83:                 .HasMaxLength(250);
+   84: 
+   85:             entity.HasIndex(x => x.Name).IsUnique();
+   86:         });
+   87: 
+   88:         // ==========================================
+   89:         // USER ROLES
+   90:         // ==========================================
+   91: 
+   92:         modelBuilder.Entity<UserRole>(entity =>
+   93:         {
+   94:             entity.ToTable("UserRoles");
+   95:             entity.HasKey(x => new { x.UserId, x.RoleId });
+   96: 
+   97:             entity.HasOne(x => x.User)
+   98:                 .WithMany(x => x.UserRoles)
+   99:                 .HasForeignKey(x => x.UserId)
+  100:                 .OnDelete(DeleteBehavior.Cascade);
+  101: 
+  102:             entity.HasOne(x => x.Role)
+  103:                 .WithMany(x => x.UserRoles)
+  104:                 .HasForeignKey(x => x.RoleId)
+  105:                 .OnDelete(DeleteBehavior.Restrict);
+  106:         });
+  107: 
+  108:         // ==========================================
+  109:         // PERMISSIONS
+  110:         // ==========================================
+  111: 
+  112:         modelBuilder.Entity<Permission>(entity =>
+  113:         {
+  114:             entity.ToTable("Permissions");
+  115:             entity.HasKey(x => x.Id);
+  116: 
+  117:             entity.Property(x => x.Code)
+  118:                 .HasMaxLength(120)
+  119:                 .IsRequired();
+  120: 
+  121:             entity.Property(x => x.Module)
+  122:                 .HasMaxLength(80)
+  123:                 .IsRequired();
+  124: 
+  125:             entity.Property(x => x.Action)
+  126:                 .HasMaxLength(80)
+  127:                 .IsRequired();
+  128: 
+  129:             entity.Property(x => x.Description)
+  130:                 .HasMaxLength(300);
+  131: 
+  132:             entity.HasIndex(x => x.Code).IsUnique();
+  133:         });
+  134: 
+  135:         // ==========================================
+  136:         // ROLE PERMISSIONS
+  137:         // ==========================================
+  138: 
+  139:         modelBuilder.Entity<RolePermission>(entity =>
+  140:         {
+  141:             entity.ToTable("RolePermissions");
+  142:             entity.HasKey(x => new { x.RoleId, x.PermissionId });
+  143: 
+  144:             entity.HasOne(x => x.Role)
+  145:                 .WithMany(x => x.RolePermissions)
+  146:                 .HasForeignKey(x => x.RoleId)
+  147:                 .OnDelete(DeleteBehavior.Cascade);
+  148: 
+  149:             entity.HasOne(x => x.Permission)
+  150:                 .WithMany(x => x.RolePermissions)
+  151:                 .HasForeignKey(x => x.PermissionId)
+  152:                 .OnDelete(DeleteBehavior.Restrict);
+  153:         });
+  154: 
+  155:         // ==========================================
+  156:         // EXTERNAL LOGINS
+  157:         // ==========================================
+  158: 
+  159:         modelBuilder.Entity<ExternalLogin>(entity =>
+  160:         {
+  161:             entity.ToTable("ExternalLogins");
+  162:             entity.HasKey(x => x.Id);
+  163: 
+  164:             entity.Property(x => x.Provider)
+  165:                 .HasMaxLength(50)
+  166:                 .IsRequired();
+  167: 
+  168:             entity.Property(x => x.ProviderSubject)
+  169:                 .HasMaxLength(255)
+  170:                 .IsRequired();
+  171: 
+  172:             entity.HasIndex(x => new
+  173:             {
+  174:                 x.Provider,
+  175:                 x.ProviderSubject
+  176:             }).IsUnique();
+  177: 
+  178:             entity.HasIndex(x => x.UserId);
+  179: 
+  180:             entity.HasOne(x => x.User)
+  181:                 .WithMany(x => x.ExternalLogins)
+  182:                 .HasForeignKey(x => x.UserId)
+  183:                 .OnDelete(DeleteBehavior.Restrict);
+  184:         });
+  185: 
+  186:         // ==========================================
+  187:         // CUSTOMERS
+  188:         // ==========================================
+  189: 
+  190:         modelBuilder.Entity<Customer>(entity =>
+  191:         {
+  192:             entity.ToTable("Customers");
+  193:             entity.HasKey(x => x.Id);
+  194: 
+  195:             entity.Property(x => x.CompanyName)
+  196:                 .HasMaxLength(200)
+  197:                 .IsRequired();
+  198: 
+  199:             entity.Property(x => x.ContactName).HasMaxLength(150);
+  200:             entity.Property(x => x.Email).HasMaxLength(254);
+  201:             entity.Property(x => x.Phone).HasMaxLength(30);
+  202:             entity.Property(x => x.Address).HasMaxLength(500);
+  203: 
+  204:             entity.HasIndex(x => x.UserId).IsUnique();
+  205:         });
+  206: 
+  207:         // ==========================================
+  208:         // SHIPMENTS
+  209:         // ==========================================
+  210: 
+  211:         modelBuilder.Entity<Shipment>(entity =>
+  212:         {
+  213:             entity.ToTable("Shipments");
+  214:             entity.HasKey(x => x.Id);
+  215: 
+  216:             entity.Property(x => x.TrackingNumber)
+  217:                 .HasMaxLength(60)
+  218:                 .IsRequired();
+  219: 
+  220:             entity.Property(x => x.Origin)
+  221:                 .HasMaxLength(250)
+  222:                 .IsRequired();
+  223: 
+  224:             entity.Property(x => x.Destination)
+  225:                 .HasMaxLength(250)
+  226:                 .IsRequired();
+  227: 
+  228:             entity.Property(x => x.Status)
+  229:                 .HasMaxLength(40)
+  230:                 .IsRequired();
+  231: 
+  232:             // Existing booking details
+  233:             entity.Property(x => x.CargoName)
+  234:                 .HasMaxLength(200)
+  235:                 .IsRequired(false);
+  236: 
+  237:             entity.Property(x => x.CargoCategory).HasMaxLength(100);
+  238:             entity.Property(x => x.PackageCount).IsRequired(false);
+  239: 
+  240:             entity.Property(x => x.TotalWeightKg)
+  241:                 .HasPrecision(12, 2)
+  242:                 .IsRequired(false);
+  243: 
+  244:             entity.Property(x => x.LengthCm).HasPrecision(12, 2);
+  245:             entity.Property(x => x.WidthCm).HasPrecision(12, 2);
+  246:             entity.Property(x => x.HeightCm).HasPrecision(12, 2);
+  247: 
+  248:             entity.Property(x => x.IsFragile).IsRequired(false);
+  249: 
+  250:             entity.Property(x => x.SpecialHandlingRequirements)
+  251:                 .HasMaxLength(500);
+  252: 
+  253:             entity.Property(x => x.Priority)
+  254:                 .HasMaxLength(20)
+  255:                 .IsRequired(false);
+  256: 
+  257:             entity.Property(x => x.PickupDateUtc).IsRequired(false);
+  258:             entity.Property(x => x.DeliveryTimeWindow).HasMaxLength(100);
+  259:             entity.Property(x => x.AdditionalInstructions).HasMaxLength(1000);
+  260: 
+  261:             entity.HasIndex(x => x.TrackingNumber).IsUnique();
+  262: 
+  263:             entity.HasOne(x => x.Customer)
+  264:                 .WithMany(x => x.Shipments)
+  265:                 .HasForeignKey(x => x.CustomerId)
+  266:                 .OnDelete(DeleteBehavior.Restrict);
+  267:         });
+  268: 
+  269:         // ==========================================
+  270:         // VEHICLES
+  271:         // ==========================================
+  272: 
+  273:         modelBuilder.Entity<Vehicle>(entity =>
+  274:         {
+  275:             entity.ToTable("Vehicles");
+  276:             entity.HasKey(x => x.Id);
+  277: 
+  278:             entity.Property(x => x.RegistrationNumber)
+  279:                 .HasMaxLength(30)
+  280:                 .IsRequired();
+  281: 
+  282:             entity.Property(x => x.VehicleType)
+  283:                 .HasMaxLength(80)
+  284:                 .IsRequired();
+  285: 
+  286:             entity.Property(x => x.CapacityKg)
+  287:                 .HasColumnType("decimal(12,2)");
+  288: 
+  289:             entity.Property(x => x.Status)
+  290:                 .HasMaxLength(40)
+  291:                 .IsRequired();
+  292: 
+  293:             entity.HasIndex(x => x.RegistrationNumber).IsUnique();
+  294:         });
+  295: 
+  296:         // ==========================================
+  297:         // DRIVERS
+  298:         // ==========================================
+  299: 
+  300:         modelBuilder.Entity<Driver>(entity =>
+  301:         {
+  302:             entity.ToTable("Drivers");
+  303:             entity.HasKey(x => x.Id);
+  304: 
+  305:             entity.Property(x => x.FullName)
+  306:                 .HasMaxLength(150)
+  307:                 .IsRequired();
+  308: 
+  309:             entity.Property(x => x.Phone).HasMaxLength(30);
+  310: 
+  311:             entity.Property(x => x.LicenseNumber)
+  312:                 .HasMaxLength(60)
+  313:                 .IsRequired();
+  314: 
+  315:             entity.Property(x => x.Status)
+  316:                 .HasMaxLength(40)
+  317:                 .IsRequired();
+  318: 
+  319:             entity.HasIndex(x => x.LicenseNumber).IsUnique();
+  320:             entity.HasIndex(x => x.UserId).IsUnique();
+  321:         });
+  322: 
+  323:         // ==========================================
+  324:         // SHIPMENT ASSIGNMENTS
+  325:         // ==========================================
+  326: 
+  327:         modelBuilder.Entity<ShipmentAssignment>(entity =>
+  328:         {
+  329:             entity.ToTable("ShipmentAssignments");
+  330:             entity.HasKey(x => x.Id);
+  331: 
+  332:             entity.Property(x => x.Status)
+  333:                 .HasMaxLength(40)
+  334:                 .IsRequired();
+  335: 
+  336:             entity.HasOne(x => x.Shipment)
+  337:                 .WithMany(x => x.Assignments)
+  338:                 .HasForeignKey(x => x.ShipmentId)
+  339:                 .OnDelete(DeleteBehavior.Restrict);
+  340: 
+  341:             entity.HasOne(x => x.Vehicle)
+  342:                 .WithMany(x => x.Assignments)
+  343:                 .HasForeignKey(x => x.VehicleId)
+  344:                 .OnDelete(DeleteBehavior.Restrict);
+  345: 
+  346:             entity.HasOne(x => x.Driver)
+  347:                 .WithMany(x => x.Assignments)
+  348:                 .HasForeignKey(x => x.DriverId)
+  349:                 .OnDelete(DeleteBehavior.Restrict);
+  350: 
+  351:             entity.HasIndex(x => x.ShipmentId);
+  352:             entity.HasIndex(x => x.VehicleId);
+  353:             entity.HasIndex(x => x.DriverId);
+  354:         });
+  355: 
+  356:         // ==========================================
+  357:         // SHIPMENT RECIPIENTS
+  358:         // ==========================================
+  359: 
+  360:         modelBuilder.Entity<ShipmentRecipient>(entity =>
+  361:         {
+  362:             entity.ToTable("ShipmentRecipients");
+  363:             entity.HasKey(x => x.Id);
+  364: 
+  365:             entity.HasOne(x => x.Shipment)
+  366:                 .WithMany()
+  367:                 .HasForeignKey(x => x.ShipmentId)
+  368:                 .OnDelete(DeleteBehavior.Restrict);
+  369: 
+  370:             entity.HasOne(x => x.User)
+  371:                 .WithMany(x => x.ShipmentRecipients)
+  372:                 .HasForeignKey(x => x.UserId)
+  373:                 .OnDelete(DeleteBehavior.Restrict);
+  374: 
+  375:             entity.HasIndex(x => new
+  376:             {
+  377:                 x.ShipmentId,
+  378:                 x.UserId
+  379:             }).IsUnique();
+  380:         });
+  381: 
+  382:         // ==========================================
+  383:         // DELIVERY PROOFS
+  384:         // ==========================================
+  385: 
+  386:         modelBuilder.Entity<DeliveryProof>(entity =>
+  387:         {
+  388:             entity.ToTable("DeliveryProofs");
+  389:             entity.HasKey(x => x.Id);
+  390: 
+  391:             entity.Property(x => x.ProofType)
+  392:                 .HasMaxLength(50)
+  393:                 .IsRequired();
+  394: 
+  395:             entity.Property(x => x.FileReference)
+  396:                 .HasMaxLength(500);
+  397: 
+  398:             entity.Property(x => x.Remarks)
+  399:                 .HasMaxLength(1000);
+  400: 
+  401:             entity.HasOne(x => x.Shipment)
+  402:                 .WithMany()
+  403:                 .HasForeignKey(x => x.ShipmentId)
+  404:                 .OnDelete(DeleteBehavior.Restrict);
+  405: 
+  406:             entity.HasOne(x => x.SubmittedByUser)
+  407:                 .WithMany(x => x.DeliveryProofs)
+  408:                 .HasForeignKey(x => x.SubmittedByUserId)
+  409:                 .OnDelete(DeleteBehavior.Restrict);
+  410: 
+  411:             entity.HasIndex(x => x.ShipmentId);
+  412:             entity.HasIndex(x => x.SubmittedByUserId);
+  413:         });
+  414: 
+  415:         // ==========================================
+  416:         // AUDIT LOGS
+  417:         // ==========================================
+  418: 
+  419:         modelBuilder.Entity<AuditLog>(entity =>
+  420:         {
+  421:             entity.ToTable("AuditLogs");
+  422:             entity.HasKey(x => x.Id);
+  423: 
+  424:             entity.Property(x => x.Action)
+  425:                 .HasMaxLength(120)
+  426:                 .IsRequired();
+  427: 
+  428:             entity.Property(x => x.EntityType)
+  429:                 .HasMaxLength(100)
+  430:                 .IsRequired();
+  431: 
+  432:             entity.Property(x => x.EntityId)
+  433:                 .HasMaxLength(100);
+  434: 
+  435:             entity.Property(x => x.Details)
+  436:                 .HasColumnType("longtext");
+  437: 

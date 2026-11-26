@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { fleetService } from "../services/fleetService";
 import "../styles/dashboard.css";
 import "../styles/dispatcher.css";
@@ -13,12 +13,18 @@ function FleetPage() {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
     const [message, setMessage] = useState("");
+    const [editingVehicleId, setEditingVehicleId] = useState(null);
 
-    const [vehicleForm, setVehicleForm] = useState({
+    const emptyVehicleForm = {
         registrationNumber: "",
         vehicleType: "",
-        capacityKg: ""
-    });
+        capacityKg: "",
+        cargoLengthCm: "",
+        cargoWidthCm: "",
+        cargoHeightCm: ""
+    };
+
+    const [vehicleForm, setVehicleForm] = useState(emptyVehicleForm);
 
     const [driverForm, setDriverForm] = useState({
         fullName: "",
@@ -56,6 +62,10 @@ function FleetPage() {
 
     useEffect(() => { load(); }, [load]);
 
+    const selectedShipment = shipments.find(
+        x => String(x.id) === String(assignmentForm.shipmentId)
+    );
+
     async function submitVehicle(event) {
         event.preventDefault();
         setSaving(true);
@@ -63,18 +73,51 @@ function FleetPage() {
         setMessage("");
 
         try {
-            await fleetService.addVehicle({
-                ...vehicleForm,
-                capacityKg: Number(vehicleForm.capacityKg)
-            });
-            setVehicleForm({ registrationNumber: "", vehicleType: "", capacityKg: "" });
-            setMessage("Vehicle added successfully.");
+            const payload = {
+                registrationNumber: vehicleForm.registrationNumber.trim(),
+                vehicleType: vehicleForm.vehicleType.trim(),
+                capacityKg: Number(vehicleForm.capacityKg),
+                cargoLengthCm: Number(vehicleForm.cargoLengthCm),
+                cargoWidthCm: Number(vehicleForm.cargoWidthCm),
+                cargoHeightCm: Number(vehicleForm.cargoHeightCm)
+            };
+
+            if (editingVehicleId) {
+                await fleetService.updateVehicle(editingVehicleId, payload);
+                setMessage("Vehicle details updated successfully.");
+            } else {
+                await fleetService.addVehicle(payload);
+                setMessage("Vehicle added successfully.");
+            }
+
+            setVehicleForm(emptyVehicleForm);
+            setEditingVehicleId(null);
             await load();
         } catch (err) {
             setError(err.message || "Unable to add vehicle.");
         } finally {
             setSaving(false);
         }
+    }
+
+    function editVehicle(item) {
+        setEditingVehicleId(item.id);
+        setVehicleForm({
+            registrationNumber: item.registrationNumber || "",
+            vehicleType: item.vehicleType || "",
+            capacityKg: item.capacityKg ?? "",
+            cargoLengthCm: item.cargoLengthCm ?? "",
+            cargoWidthCm: item.cargoWidthCm ?? "",
+            cargoHeightCm: item.cargoHeightCm ?? ""
+        });
+        setError("");
+        setMessage("");
+        setTab("vehicles");
+    }
+
+    function cancelVehicleEdit() {
+        setEditingVehicleId(null);
+        setVehicleForm(emptyVehicleForm);
     }
 
     async function submitDriver(event) {
@@ -161,34 +204,52 @@ function FleetPage() {
             {!loading && tab === "vehicles" && (
                 <>
                     <form className="dashboard-card fleet-form" onSubmit={submitVehicle}>
-                        <h2>Add vehicle</h2>
+                        <h2>{editingVehicleId ? "Edit vehicle" : "Add vehicle"}</h2>
                         <div className="fleet-form-grid">
                             <input required maxLength="30" placeholder="Registration number" value={vehicleForm.registrationNumber} onChange={e => setVehicleForm({ ...vehicleForm, registrationNumber: e.target.value })} />
                             <input required maxLength="80" placeholder="Vehicle type" value={vehicleForm.vehicleType} onChange={e => setVehicleForm({ ...vehicleForm, vehicleType: e.target.value })} />
-                            <input required type="number" min="0.01" step="0.01" placeholder="Capacity (kg)" value={vehicleForm.capacityKg} onChange={e => setVehicleForm({ ...vehicleForm, capacityKg: e.target.value })} />
-                            <button className="button-primary" disabled={saving}>{saving ? "Saving..." : "Add vehicle"}</button>
+                            <input required type="number" min="0.01" step="0.01" placeholder="Payload capacity (kg)" value={vehicleForm.capacityKg} onChange={e => setVehicleForm({ ...vehicleForm, capacityKg: e.target.value })} />
+                            <input required type="number" min="0.01" step="0.01" placeholder="Cargo length (cm)" value={vehicleForm.cargoLengthCm} onChange={e => setVehicleForm({ ...vehicleForm, cargoLengthCm: e.target.value })} />
+                            <input required type="number" min="0.01" step="0.01" placeholder="Cargo width (cm)" value={vehicleForm.cargoWidthCm} onChange={e => setVehicleForm({ ...vehicleForm, cargoWidthCm: e.target.value })} />
+                            <input required type="number" min="0.01" step="0.01" placeholder="Cargo height (cm)" value={vehicleForm.cargoHeightCm} onChange={e => setVehicleForm({ ...vehicleForm, cargoHeightCm: e.target.value })} />
+                            <button className="button-primary" disabled={saving}>
+                                {saving ? "Saving..." : editingVehicleId ? "Update vehicle" : "Add vehicle"}
+                            </button>
+                            {editingVehicleId && (
+                                <button className="button-secondary" type="button" onClick={cancelVehicleEdit}>
+                                    Cancel edit
+                                </button>
+                            )}
                         </div>
                     </form>
 
                     <div className="dashboard-card dispatcher-table-card">
                         <div className="activity-table-wrap">
                             <table className="activity-table dispatcher-table">
-                                <thead><tr><th>Registration</th><th>Type</th><th>Capacity</th><th>Status</th><th>Change status</th></tr></thead>
+                                <thead><tr><th>Registration</th><th>Type</th><th>Payload</th><th>Cargo dimensions (L × W × H)</th><th>Status</th><th>Actions</th></tr></thead>
                                 <tbody>
                                     {vehicles.map(item => (
                                         <tr key={item.id}>
                                             <td>{item.registrationNumber}</td>
                                             <td>{item.vehicleType}</td>
                                             <td>{item.capacityKg} kg</td>
+                                            <td>
+                                                {item.cargoLengthCm && item.cargoWidthCm && item.cargoHeightCm
+                                                    ? `${item.cargoLengthCm} × ${item.cargoWidthCm} × ${item.cargoHeightCm} cm`
+                                                    : "Dimensions not configured"}
+                                            </td>
                                             <td>{item.status}</td>
                                             <td>
+                                                <button className="button-secondary" type="button" onClick={() => editVehicle(item)}>
+                                                    Edit
+                                                </button>
                                                 <select value={item.status} onChange={e => changeStatus("vehicle", item, e.target.value)}>
                                                     <option>Available</option><option>Maintenance</option><option>Inactive</option>
                                                 </select>
                                             </td>
                                         </tr>
                                     ))}
-                                    {vehicles.length === 0 && <tr><td colSpan="5">No vehicles registered.</td></tr>}
+                                    {vehicles.length === 0 && <tr><td colSpan="6">No vehicles registered.</td></tr>}
                                 </tbody>
                             </table>
                         </div>
@@ -240,6 +301,24 @@ function FleetPage() {
                                 <option value="">Select confirmed shipment</option>
                                 {shipments.map(x => <option key={x.id} value={x.id}>{x.trackingNumber} — {x.customer}</option>)}
                             </select>
+                            {selectedShipment && (
+                                <div className="dashboard-empty">
+                                    <strong>Selected cargo:</strong>{" "}
+                                    {selectedShipment.cargoName || selectedShipment.cargoCategory || "Shipment cargo"}
+                                    {" · "}
+                                    Weight: {selectedShipment.weightKg ?? "Not recorded"} kg
+                                    {" · "}
+                                    Dimensions: {
+                                        selectedShipment.lengthCm &&
+                                        selectedShipment.widthCm &&
+                                        selectedShipment.heightCm
+                                            ? `${selectedShipment.lengthCm} × ${selectedShipment.widthCm} × ${selectedShipment.heightCm} cm`
+                                            : "Package-level dimensions or shipment dimensions required"
+                                    }
+                                    {" · "}
+                                    Packages: {selectedShipment.packageCount ?? "Not recorded"}
+                                </div>
+                            )}
                             <select required value={assignmentForm.driverId} onChange={e => setAssignmentForm({ ...assignmentForm, driverId: e.target.value })}>
                                 <option value="">Select available driver</option>
                                 {drivers.filter(x => x.status === "Available").map(x => <option key={x.id} value={x.id}>{x.fullName}</option>)}

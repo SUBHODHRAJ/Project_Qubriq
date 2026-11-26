@@ -1,10 +1,11 @@
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Qubriq.API.Data;
 using Microsoft.AspNetCore.Authorization;
 using Qubriq.API.Authorization;
 using Qubriq.API.Services;
+using Qubriq.API.Services.LoadOptimization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,6 +32,7 @@ builder.Services.AddDbContext<QubriqDbContext>(options =>
 // ==========================================
 
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<ILoadOptimizationService, LoadOptimizationService>();
 builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 
 // ==========================================
@@ -223,3 +225,4 @@ app.MapGet("/", () => Results.Ok(new
 }));
 
 app.Run();
+

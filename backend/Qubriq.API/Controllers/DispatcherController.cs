@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -152,6 +152,9 @@ public class DispatcherController : ControllerBase
                 cargoCategory = x.CargoCategory,
                 packageCount = x.PackageCount,
                 weightKg = x.TotalWeightKg,
+                lengthCm = x.LengthCm,
+                widthCm = x.WidthCm,
+                heightCm = x.HeightCm,
                 priority = x.Priority,
                 pickupDateUtc = x.PickupDateUtc,
                 expectedDeliveryUtc = x.ExpectedDeliveryUtc,

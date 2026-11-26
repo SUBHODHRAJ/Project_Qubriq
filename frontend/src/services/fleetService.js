@@ -1,4 +1,4 @@
-﻿import { apiRequest } from "./apiClient";
+import { apiRequest } from "./apiClient";
 
 const BASE = "/api/fleet";
 
@@ -6,6 +6,10 @@ export const fleetService = {
     getVehicles: () => apiRequest(`${BASE}/vehicles`),
     addVehicle: (data) => apiRequest(`${BASE}/vehicles`, {
         method: "POST",
+        body: JSON.stringify(data)
+    }),
+    updateVehicle: (id, data) => apiRequest(`${BASE}/vehicles/${id}`, {
+        method: "PUT",
         body: JSON.stringify(data)
     }),
     updateVehicleStatus: (id, status) => apiRequest(`${BASE}/vehicles/${id}/status`, {

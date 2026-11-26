@@ -20,13 +20,14 @@ import ShipmentsPage from "../pages/ShipmentsPage";
 import ShipmentDetailsPage from "../pages/ShipmentDetailsPage";
 import DeliveryOperationsPage from "../pages/DeliveryOperationsPage";
 import FleetPage from "../pages/FleetPage";
+import LoadOptimizationPage from "../pages/LoadOptimizationPage";
 import ModulePage from "../pages/ModulePage";
 
 const internalRoles = ["Admin", "OperationsDispatcher"];
 
 const modules = [
     { path: "fleet", title: "Fleet & Capacity Planning", description: "Manage vehicles, driver assignments and shipment allocation.", component: FleetPage },
-    { path: "load-optimization", title: "3D Load Optimization", description: "Priority-aware 3D cargo packing for the selected vehicle and shipment group." },
+
     { path: "compliance", title: "Compliance & E-Way Bill Management", description: "Manage shipment documents, E-Way Bill validity and compliance checks." },
     { path: "routes", title: "Route & Transportation Planning", description: "Plan trips, compare routes and check delivery feasibility and E-Way Bill validity." },
     { path: "tracking", title: "Live Tracking", description: "Track active vehicles and shipments in real time." },
@@ -70,6 +71,7 @@ function AppRoutes() {
                     <Route path="bookings/new" element={<BookingsPage />} />
                     <Route path="shipments" element={<ShipmentsPage />} />
                     <Route path="deliveries" element={<DeliveryOperationsPage />} />
+                    <Route path="load-optimization" element={<LoadOptimizationPage />} />
                     <Route path="shipments/:id" element={<ShipmentDetailsPage />} />
 
                     <Route element={<ProtectedRoute allowedRoles={["Admin"]} />}>
@@ -78,18 +80,24 @@ function AppRoutes() {
                         <Route path="settings" element={<ModulePage title="Settings" description="Platform settings." />} />
                     </Route>
 
-                    {modules.map(module => (
-                        <Route
-                            key={module.path}
-                            path={module.path}
-                            element={
-                                <ModulePage
-                                    title={module.title}
-                                    description={module.description}
-                                />
-                            }
-                        />
-                    ))}
+                    {modules.map(module => {
+                        const PageComponent = module.component;
+
+                        return (
+                            <Route
+                                key={module.path}
+                                path={module.path}
+                                element={
+                                    PageComponent
+                                        ? <PageComponent />
+                                        : <ModulePage
+                                            title={module.title}
+                                            description={module.description}
+                                        />
+                                }
+                            />
+                        );
+                    })}
                 </Route>
             </Route>
 
@@ -100,6 +108,8 @@ function AppRoutes() {
 }
 
 export default AppRoutes;
+
+
 
 
 
