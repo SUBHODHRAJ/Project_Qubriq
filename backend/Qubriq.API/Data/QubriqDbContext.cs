@@ -11,6 +11,7 @@ public class QubriqDbContext : DbContext
     }
 
     public DbSet<User> Users => Set<User>();
+    public DbSet<AccountRegistrationPolicy> AccountRegistrationPolicies => Set<AccountRegistrationPolicy>();
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<Permission> Permissions => Set<Permission>();
@@ -34,6 +35,23 @@ public class QubriqDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        modelBuilder.Entity<AccountRegistrationPolicy>(entity =>
+        {
+            entity.ToTable("AccountRegistrationPolicies");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.HasData(new AccountRegistrationPolicy
+            {
+                Id = 1,
+                PublicRegistrationEnabled = true,
+                BookingCustomerSignupEnabled = true,
+                FinalRecipientSignupEnabled = false,
+                RequireAdminApproval = false,
+                ActivatePublicAccountsImmediately = true,
+                AdminAccountCreationEnabled = true,
+                UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+            });
+        });
         // ==========================================
         // USERS
         // ==========================================
@@ -630,4 +648,5 @@ public class QubriqDbContext : DbContext
         });
     }
 }
+
 

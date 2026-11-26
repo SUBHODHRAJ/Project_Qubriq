@@ -44,6 +44,9 @@ public class AdminCustomersController : ControllerBase
         long customerId,
         [FromBody] CreateCustomerAccountRequest request)
     {
+        var accountPolicy = await _db.AccountRegistrationPolicies.FirstOrDefaultAsync(x => x.Id == 1);
+        if (accountPolicy == null || !accountPolicy.AdminAccountCreationEnabled)
+            return StatusCode(403, new { message = "Administrator account creation is disabled by policy." });
         var adminUserId = GetAuthenticatedUserId();
 
         if (!adminUserId.HasValue)
@@ -195,3 +198,4 @@ public class AdminCustomersController : ControllerBase
         });
     }
 }
+

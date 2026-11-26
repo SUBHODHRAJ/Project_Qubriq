@@ -22,6 +22,7 @@ import DeliveryOperationsPage from "../pages/DeliveryOperationsPage";
 import FleetPage from "../pages/FleetPage";
 import LoadOptimizationPage from "../pages/LoadOptimizationPage";
 import ModulePage from "../pages/ModulePage";
+import AdminSettingsPage from "../pages/AdminSettingsPage";
 
 const internalRoles = ["Admin", "OperationsDispatcher"];
 
@@ -77,7 +78,7 @@ function AppRoutes() {
                     <Route element={<ProtectedRoute allowedRoles={["Admin"]} />}>
                         <Route path="customers" element={<CustomersPage />} />
                         <Route path="finance" element={<ModulePage title="Finance" description="Finance workspace." />} />
-                        <Route path="settings" element={<ModulePage title="Settings" description="Platform settings." />} />
+                        <Route path="settings" element={<AdminSettingsPage />} />
                     </Route>
 
                     {modules.map(module => {
@@ -108,6 +109,7 @@ function AppRoutes() {
 }
 
 export default AppRoutes;
+
 
 
 
