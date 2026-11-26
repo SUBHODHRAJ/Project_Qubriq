@@ -1,0 +1,1890 @@
+﻿========== Controllers\AdminBootstrapController.cs ==========
+using System.Data;
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Qubriq.API.Data;
+using Qubriq.API.DTOs.Auth;
+using Qubriq.API.Models;
+
+namespace Qubriq.API.Controllers;
+
+[ApiController]
+[Route("api/auth/bootstrap")]
+public class AdminBootstrapController : ControllerBase
+{
+    private readonly QubriqDbContext _db;
+    private readonly IConfiguration _configuration;
+    private readonly IWebHostEnvironment _environment;
+
+    public AdminBootstrapController(
+        QubriqDbContext db,
+        IConfiguration configuration,
+        IWebHostEnvironment environment)
+    {
+        _db = db;
+        _configuration = configuration;
+        _environment = environment;
+    }
+
+    [AllowAnonymous]
+    [HttpPost("admin")]
+    public async Task<IActionResult> CreateFirstAdmin(
+        [FromBody] BootstrapAdminRequest request)
+    {
+        // Never expose bootstrap outside Development.
+        if (!_environment.IsDevelopment())
+        {
+            return NotFound();
+        }
+
+        var configuredSecret = _configuration["Bootstrap:Secret"];
+        var suppliedSecret = Request.Headers["X-Qubriq-Bootstrap-Key"].ToString();
+
+        if (string.IsNullOrWhiteSpace(configuredSecret) ||
+            string.IsNullOrWhiteSpace(suppliedSecret))
+        {
+            return Unauthorized(new
+            {
+                message = "Invalid bootstrap credentials."
+            });
+        }
+
+        var expectedBytes = Encoding.UTF8.GetBytes(configuredSecret);
+        var suppliedBytes = Encoding.UTF8.GetBytes(suppliedSecret);
+
+        if (expectedBytes.Length != suppliedBytes.Length ||
+            !CryptographicOperations.FixedTimeEquals(
+                expectedBytes,
+                suppliedBytes))
+        {
+            return Unauthorized(new
+            {
+                message = "Invalid bootstrap credentials."
+            });
+        }
+
+        var fullName = request.FullName.Trim();
+        var email = request.Email.Trim().ToLowerInvariant();
+
+        if (string.IsNullOrWhiteSpace(fullName) ||
+            string.IsNullOrWhiteSpace(email))
+        {
+            return BadRequest(new
+            {
+                message = "Full name and email are required."
+            });
+        }
+
+        await using var transaction =
+            await _db.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable);
+
+        try
+        {
+            // Bootstrap is permitted only for a completely empty user table.
+            var existingUser = await _db.Users.AnyAsync();
+
+            if (existingUser)
+            {
+                await transaction.RollbackAsync();
+
+                return Conflict(new
+                {
+                    message = "Bootstrap is disabled because a user account already exists."
+                });
+            }
+
+            var adminRole = await _db.Roles
+                .FirstOrDefaultAsync(x => x.Name == "Admin");
+
+            if (adminRole == null)
+            {
+                await transaction.RollbackAsync();
+
+                return StatusCode(500, new
+                {
+                    message = "Admin role is missing. Verify RBAC seed data."
+                });
+            }
+
+            var user = new User
+            {
+                FullName = fullName,
+                Email = email,
+                EmailVerified = true,
+                PasswordHash = null,
+                IsActive = true,
+                CreatedAtUtc = DateTime.UtcNow
+            };
+
+            var passwordHasher = new PasswordHasher<User>();
+
+            user.PasswordHash = passwordHasher.HashPassword(
+                user,
+                request.Password);
+
+            _db.Users.Add(user);
+
+            await _db.SaveChangesAsync();
+
+            var userRole = new UserRole
+            {
+                UserId = user.Id,
+                RoleId = adminRole.Id,
+                AssignedAtUtc = DateTime.UtcNow
+            };
+
+            _db.UserRoles.Add(userRole);
+
+            await _db.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            return Created(
+                "/api/auth/login",
+                new
+                {
+                    message = "Initial Admin account created successfully.",
+                    userId = user.Id,
+                    fullName = user.FullName,
+                    email = user.Email,
+                    role = "Admin",
+                    nextStep = "Sign in using POST /api/auth/login."
+                });
+        }
+        catch (DbUpdateException)
+        {
+            await transaction.RollbackAsync();
+
+            return Conflict(new
+            {
+                message = "Account creation conflicted with existing database data."
+            });
+        }
+    }
+}
+========== Controllers\AdminCustomersController.cs ==========
+using System.Data;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Qubriq.API.Data;
+using Qubriq.API.DTOs.Admin;
+using Qubriq.API.Models;
+
+namespace Qubriq.API.Controllers;
+
+[ApiController]
+[Route("api/admin/customers")]
+[Authorize(Policy = "AdminCustomerProvision")]
+public class AdminCustomersController : ControllerBase
+{
+    private readonly QubriqDbContext _db;
+    private readonly PasswordHasher<User> _passwordHasher;
+
+    public AdminCustomersController(QubriqDbContext db)
+    {
+        _db = db;
+        _passwordHasher = new PasswordHasher<User>();
+    }
+
+    private long? GetAuthenticatedUserId()
+    {
+        var subject =
+            User.FindFirst("sub")?.Value ??
+            User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (long.TryParse(subject, out var userId))
+        {
+            return userId;
+        }
+
+        return null;
+    }
+
+    // POST: api/admin/customers/{customerId}/account
+    [HttpPost("{customerId:long}/account")]
+    public async Task<IActionResult> CreateCustomerAccount(
+        long customerId,
+        [FromBody] CreateCustomerAccountRequest request)
+    {
+        var adminUserId = GetAuthenticatedUserId();
+
+        if (!adminUserId.HasValue)
+        {
+            return Unauthorized();
+        }
+
+        var email = request.Email.Trim().ToLowerInvariant();
+        var fullName = request.FullName.Trim();
+
+        if (string.IsNullOrWhiteSpace(fullName) ||
+            string.IsNullOrWhiteSpace(email) ||
+            string.IsNullOrWhiteSpace(request.Password))
+        {
+            return BadRequest(new
+            {
+                message = "Full name, email and password are required."
+            });
+        }
+
+        if (request.Password.Length < 12 ||
+            request.Password.Length > 128)
+        {
+            return BadRequest(new
+            {
+                message = "Password must contain between 12 and 128 characters."
+            });
+        }
+
+        await using var transaction =
+            await _db.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable);
+
+        var customer = await _db.Customers
+            .FirstOrDefaultAsync(x => x.Id == customerId);
+
+        if (customer == null)
+        {
+            return NotFound(new
+            {
+                message = "Customer record was not found."
+            });
+        }
+
+        if (!customer.IsActive)
+        {
+            return BadRequest(new
+            {
+                message = "An inactive customer cannot receive a login account."
+            });
+        }
+
+        if (customer.UserId.HasValue)
+        {
+            return Conflict(new
+            {
+                message = "This customer already has a linked user account.",
+                customerId = customer.Id
+            });
+        }
+
+        var existingUser = await _db.Users
+            .AnyAsync(x => x.Email == email);
+
+        if (existingUser)
+        {
+            return Conflict(new
+            {
+                message = "An account with this email address already exists."
+            });
+        }
+
+        var customerRole = await _db.Roles
+            .FirstOrDefaultAsync(x => x.Name == "BookingCustomer");
+
+        if (customerRole == null)
+        {
+            return StatusCode(500, new
+            {
+                message = "BookingCustomer role is missing. Check RBAC seed data."
+            });
+        }
+
+        var user = new User
+        {
+            FullName = fullName,
+            Email = email,
+            IsActive = true,
+            EmailVerified = false,
+            RecipientType = null,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+        user.PasswordHash = _passwordHasher.HashPassword(
+            user,
+            request.Password);
+
+        _db.Users.Add(user);
+
+        await _db.SaveChangesAsync();
+
+        var userRole = new UserRole
+        {
+            UserId = user.Id,
+            RoleId = customerRole.Id,
+            AssignedAtUtc = DateTime.UtcNow
+        };
+
+        _db.UserRoles.Add(userRole);
+
+        customer.UserId = user.Id;
+
+        var auditLog = new AuditLog
+        {
+            UserId = adminUserId.Value,
+            Action = "CUSTOMER_ACCOUNT_PROVISIONED",
+            EntityType = "Customer",
+            EntityId = customer.Id.ToString(),
+            Details =
+                $"Created BookingCustomer account. UserId={user.Id}; Email={email}",
+            CreatedAtUtc = DateTime.UtcNow
+        };
+
+        _db.AuditLogs.Add(auditLog);
+
+        await _db.SaveChangesAsync();
+
+        await transaction.CommitAsync();
+
+        return Ok(new
+        {
+            message = "Customer account created and linked successfully.",
+            customer = new
+            {
+                customer.Id,
+                customer.CompanyName,
+                customer.UserId
+            },
+            account = new
+            {
+                user.Id,
+                user.FullName,
+                user.Email,
+                role = customerRole.Name,
+                user.IsActive,
+                user.EmailVerified
+            }
+        });
+    }
+}
+========== Controllers\AdminRecipientsController.cs ==========
+using System.Data;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Qubriq.API.Data;
+using Qubriq.API.Models;
+
+namespace Qubriq.API.Controllers;
+
+[ApiController]
+[Route("api/admin/recipients")]
+[Authorize(Roles = "Admin")]
+public class AdminRecipientsController : ControllerBase
+{
+    private readonly QubriqDbContext _db;
+    private readonly PasswordHasher<User> _hasher = new();
+
+    public AdminRecipientsController(QubriqDbContext db)
+    {
+        _db = db;
+    }
+
+    private long? AdminId()
+    {
+        var value = User.FindFirst("sub")?.Value ??
+                    User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        return long.TryParse(value, out var id) ? id : null;
+    }
+
+    private async Task<bool> HasPermission(string code)
+    {
+        var id = AdminId();
+        if (!id.HasValue) return false;
+
+        return await _db.UserRoles
+            .Where(x => x.UserId == id.Value)
+            .Join(_db.RolePermissions,
+                x => x.RoleId,
+                x => x.RoleId,
+                (_, permission) => permission)
+            .AnyAsync(x =>
+                x.IsAllowed && x.Permission.Code == code);
+    }
+
+    public sealed class CreateRecipientRequest
+    {
+        public string FullName { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string Password { get; set; } = "";
+        public string RecipientType { get; set; } = "";
+        public long? DriverId { get; set; }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> CreateRecipient(
+        [FromBody] CreateRecipientRequest request)
+    {
+        if (!await HasPermission("users.create") ||
+            !await HasPermission("users.assign_role"))
+            return Forbid();
+
+        if (request == null)
+            return BadRequest(new { message = "Recipient details are required." });
+
+        var name = request.FullName?.Trim() ?? "";
+        var email = request.Email?.Trim().ToLowerInvariant() ?? "";
+        var password = request.Password;
+        var type = request.RecipientType?.Trim() ?? "";
+
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 150)
+            return BadRequest(new { message = "Name is required and must not exceed 150 characters." });
+
+        if (string.IsNullOrWhiteSpace(email) || email.Length > 254)
+            return BadRequest(new { message = "A valid email address is required." });
+
+        try
+        {
+            var parsedEmail = new System.Net.Mail.MailAddress(email);
+
+            if (!string.Equals(
+                parsedEmail.Address,
+                email,
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest(new { message = "A valid email address is required." });
+            }
+        }
+        catch (FormatException)
+        {
+            return BadRequest(new { message = "A valid email address is required." });
+        }
+
+        if (string.IsNullOrEmpty(password) ||
+            password.Length < 12 ||
+            password.Length > 128)
+        {
+            return BadRequest(new { message = "Password must be 12-128 characters." });
+        }
+
+        if (type != "DeliveryPersonnel" && type != "FinalRecipient")
+            return BadRequest(new { message = "Invalid recipient subtype." });
+
+        if (type == "DeliveryPersonnel" && !request.DriverId.HasValue)
+            return BadRequest(new { message = "DriverId is required for DeliveryPersonnel." });
+
+        if (type == "FinalRecipient" && request.DriverId.HasValue)
+            return BadRequest(new { message = "FinalRecipient cannot be linked to a Driver." });
+
+        await using var tx = await _db.Database.BeginTransactionAsync(
+            IsolationLevel.Serializable);
+
+        if (await _db.Users.AnyAsync(x => x.Email == email))
+            return Conflict(new { message = "Email already exists." });
+
+        Driver? driver = null;
+
+        if (type == "DeliveryPersonnel")
+        {
+            driver = await _db.Drivers
+                .FirstOrDefaultAsync(x => x.Id == request.DriverId.GetValueOrDefault());
+
+            if (driver == null)
+                return NotFound(new { message = "Driver not found." });
+
+            if (driver.UserId.HasValue)
+                return Conflict(new { message = "Driver already has a linked user." });
+        }
+
+        var role = await _db.Roles
+            .FirstOrDefaultAsync(x => x.Name == "ShipmentRecipient");
+
+        if (role == null)
+            return StatusCode(500, new { message = "ShipmentRecipient role is missing." });
+
+        var user = new User
+        {
+            FullName = name,
+            Email = email,
+            RecipientType = type,
+            IsActive = true,
+            EmailVerified = false,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+        user.PasswordHash = _hasher.HashPassword(user, request.Password);
+
+        _db.Users.Add(user);
+        await _db.SaveChangesAsync();
+
+        _db.UserRoles.Add(new UserRole
+        {
+            UserId = user.Id,
+            RoleId = role.Id,
+            AssignedAtUtc = DateTime.UtcNow
+        });
+
+        if (driver != null)
+            driver.UserId = user.Id;
+
+        _db.AuditLogs.Add(new AuditLog
+        {
+            UserId = AdminId(),
+            Action = "RECIPIENT_ACCOUNT_PROVISIONED",
+            EntityType = "User",
+            EntityId = user.Id.ToString(),
+            Details = $"RecipientType={type}; DriverId={driver?.Id}",
+            CreatedAtUtc = DateTime.UtcNow
+        });
+
+        await _db.SaveChangesAsync();
+        await tx.CommitAsync();
+
+        return Created("", new
+        {
+            user.Id,
+            user.FullName,
+            user.Email,
+            user.RecipientType,
+            user.IsActive,
+            DriverId = driver?.Id
+        });
+    }
+}
+========== Controllers\FleetController.cs ==========
+using System.Data;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Qubriq.API.Data;
+using Qubriq.API.Models;
+
+namespace Qubriq.API.Controllers;
+
+[ApiController]
+[Route("api/fleet")]
+[Authorize(Roles = "Admin,OperationsDispatcher")]
+public class FleetController : ControllerBase
+{
+    private readonly QubriqDbContext _db;
+
+    public FleetController(QubriqDbContext db)
+    {
+        _db = db;
+    }
+
+    private long? UserId()
+    {
+        var value = User.FindFirst("sub")?.Value
+            ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        return long.TryParse(value, out var id) ? id : null;
+    }
+
+    private async Task<bool> Allowed(string permission)
+    {
+        var id = UserId();
+        if (!id.HasValue) return false;
+
+        if (!await _db.Users.AnyAsync(x => x.Id == id.Value && x.IsActive))
+            return false;
+
+        return await _db.UserRoles
+            .Where(x => x.UserId == id.Value)
+            .Join(_db.RolePermissions,
+                ur => ur.RoleId,
+                rp => rp.RoleId,
+                (_, rp) => rp)
+            .AnyAsync(x => x.IsAllowed && x.Permission.Code == permission);
+    }
+
+    // VEHICLES
+
+    [HttpGet("vehicles")]
+    public async Task<IActionResult> GetVehicles()
+    {
+        if (!await Allowed("fleet.vehicles.manage")) return Forbid();
+
+        var items = await _db.Vehicles
+            .AsNoTracking()
+            .OrderBy(x => x.RegistrationNumber)
+            .Select(x => new
+            {
+                x.Id,
+                x.RegistrationNumber,
+                x.VehicleType,
+                x.CapacityKg,
+                x.Status
+            }).ToListAsync();
+
+        return Ok(items);
+    }
+
+    [HttpPost("vehicles")]
+    public async Task<IActionResult> CreateVehicle(VehicleRequest request)
+    {
+        if (!await Allowed("fleet.vehicles.manage")) return Forbid();
+
+        if (string.IsNullOrWhiteSpace(request.RegistrationNumber) ||
+            string.IsNullOrWhiteSpace(request.VehicleType) ||
+            request.RegistrationNumber.Trim().Length > 30 ||
+            request.VehicleType.Trim().Length > 80 ||
+            request.CapacityKg <= 0)
+            return BadRequest(new { message = "Enter a valid registration, vehicle type and positive capacity." });
+
+        var registration = request.RegistrationNumber.Trim().ToUpperInvariant();
+
+        if (await _db.Vehicles.AnyAsync(x => x.RegistrationNumber == registration))
+            return Conflict(new { message = "Registration number already exists." });
+
+        var vehicle = new Vehicle
+        {
+            RegistrationNumber = registration,
+            VehicleType = request.VehicleType.Trim(),
+            CapacityKg = request.CapacityKg,
+            Status = "Available"
+        };
+
+        _db.Vehicles.Add(vehicle);
+        await _db.SaveChangesAsync();
+
+        return CreatedAtAction(nameof(GetVehicles), new { },
+            new { vehicle.Id, vehicle.RegistrationNumber, vehicle.Status });
+    }
+
+    [HttpPatch("vehicles/{id:long}/status")]
+    public async Task<IActionResult> UpdateVehicleStatus(long id, StatusRequest request)
+    {
+        if (!await Allowed("fleet.vehicles.manage")) return Forbid();
+
+        if (request.Status is not ("Available" or "Maintenance" or "Inactive"))
+            return BadRequest(new { message = "Status must be Available, Maintenance or Inactive." });
+
+        var vehicle = await _db.Vehicles.FirstOrDefaultAsync(x => x.Id == id);
+        if (vehicle == null) return NotFound();
+
+        var active = await _db.ShipmentAssignments.AnyAsync(
+            x => x.VehicleId == id && x.Status == "Active");
+
+        if (active && request.Status != "Available")
+            return Conflict(new { message = "Release the active assignment before changing vehicle status." });
+
+        vehicle.Status = request.Status;
+        await _db.SaveChangesAsync();
+        return Ok(new { vehicle.Id, vehicle.Status });
+    }
+
+    // DRIVERS
+
+    [HttpGet("drivers")]
+    public async Task<IActionResult> GetDrivers()
+    {
+        if (!await Allowed("fleet.drivers.manage")) return Forbid();
+
+        var items = await _db.Drivers
+            .AsNoTracking()
+            .OrderBy(x => x.FullName)
+            .Select(x => new
+            {
+                x.Id,
+                x.FullName,
+                x.Phone,
+                x.LicenseNumber,
+                x.Status,
+                x.UserId
+            }).ToListAsync();
+
+        return Ok(items);
+    }
+
+    [HttpPost("drivers")]
+    public async Task<IActionResult> CreateDriver(DriverRequest request)
+    {
+        if (!await Allowed("fleet.drivers.manage")) return Forbid();
+
+        if (string.IsNullOrWhiteSpace(request.FullName) ||
+            string.IsNullOrWhiteSpace(request.LicenseNumber) ||
+            request.FullName.Trim().Length > 150 ||
+            request.LicenseNumber.Trim().Length > 60 ||
+            (request.Phone?.Length ?? 0) > 30)
+            return BadRequest(new { message = "Enter valid driver name, license number and phone." });
+
+        var license = request.LicenseNumber.Trim().ToUpperInvariant();
+
+        if (await _db.Drivers.AnyAsync(x => x.LicenseNumber == license))
+            return Conflict(new { message = "License number already exists." });
+
+        var driver = new Driver
+        {
+            FullName = request.FullName.Trim(),
+            Phone = request.Phone?.Trim(),
+            LicenseNumber = license,
+            Status = "Available"
+        };
+
+        _db.Drivers.Add(driver);
+        await _db.SaveChangesAsync();
+
+        return CreatedAtAction(nameof(GetDrivers), new { },
+            new { driver.Id, driver.FullName, driver.Status });
+    }
+
+    [HttpPatch("drivers/{id:long}/status")]
+    public async Task<IActionResult> UpdateDriverStatus(long id, StatusRequest request)
+    {
+        if (!await Allowed("fleet.drivers.manage")) return Forbid();
+
+        if (request.Status is not ("Available" or "OnLeave" or "Inactive"))
+            return BadRequest(new { message = "Status must be Available, OnLeave or Inactive." });
+
+        var driver = await _db.Drivers.FirstOrDefaultAsync(x => x.Id == id);
+        if (driver == null) return NotFound();
+
+        var active = await _db.ShipmentAssignments.AnyAsync(
+            x => x.DriverId == id && x.Status == "Active");
+
+        if (active && request.Status != "Available")
+            return Conflict(new { message = "Release the active assignment before changing driver status." });
+
+        driver.Status = request.Status;
+        await _db.SaveChangesAsync();
+        return Ok(new { driver.Id, driver.Status });
+    }
+
+    // ASSIGNMENTS
+
+    [HttpGet("assignments")]
+    public async Task<IActionResult> GetAssignments()
+    {
+        if (!await Allowed("fleet.assignments.manage")) return Forbid();
+
+        var items = await _db.ShipmentAssignments
+            .AsNoTracking()
+            .Include(x => x.Shipment)
+            .Include(x => x.Driver)
+            .Include(x => x.Vehicle)
+            .OrderByDescending(x => x.AssignedAtUtc)
+            .Select(x => new
+            {
+                x.Id,
+                x.ShipmentId,
+                trackingNumber = x.Shipment.TrackingNumber,
+                driver = x.Driver.FullName,
+                vehicle = x.Vehicle.RegistrationNumber,
+                x.AssignedAtUtc,
+                x.ReleasedAtUtc,
+                x.Status
+            }).ToListAsync();
+
+        return Ok(items);
+    }
+
+    [HttpPost("assignments")]
+    public async Task<IActionResult> Assign(AssignmentRequest request)
+    {
+        if (!await Allowed("fleet.assignments.manage")) return Forbid();
+
+        if (request.ShipmentId <= 0 || request.DriverId <= 0 || request.VehicleId <= 0)
+            return BadRequest(new { message = "Select a shipment, driver and vehicle." });
+
+        await using var tx = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+
+        var shipment = await _db.Shipments
+            .FirstOrDefaultAsync(x => x.Id == request.ShipmentId);
+
+        if (shipment == null) return NotFound(new { message = "Shipment not found." });
+
+        if (shipment.Status != "Confirmed")
+            return Conflict(new { message = "Only Confirmed bookings can be assigned." });
+
+        var driver = await _db.Drivers.FirstOrDefaultAsync(x => x.Id == request.DriverId);
+        var vehicle = await _db.Vehicles.FirstOrDefaultAsync(x => x.Id == request.VehicleId);
+
+        if (driver == null || vehicle == null)
+            return BadRequest(new { message = "Driver or vehicle not found." });
+
+        if (driver.Status != "Available" || vehicle.Status != "Available")
+            return Conflict(new { message = "Driver and vehicle must both be Available." });
+
+        if (shipment.TotalWeightKg.HasValue &&
+            shipment.TotalWeightKg.Value > vehicle.CapacityKg)
+            return Conflict(new { message = "Shipment weight exceeds vehicle capacity." });
+
+        var shipmentAssigned = await _db.ShipmentAssignments.AnyAsync(
+            x => x.ShipmentId == request.ShipmentId && x.Status == "Active");
+
+        var driverAssigned = await _db.ShipmentAssignments.AnyAsync(
+            x => x.DriverId == request.DriverId && x.Status == "Active");
+
+        var vehicleAssigned = await _db.ShipmentAssignments.AnyAsync(
+            x => x.VehicleId == request.VehicleId && x.Status == "Active");
+
+        if (shipmentAssigned || driverAssigned || vehicleAssigned)
+            return Conflict(new { message = "Shipment, driver or vehicle already has an active assignment." });
+
+        var assignment = new ShipmentAssignment
+        {
+            ShipmentId = shipment.Id,
+            DriverId = driver.Id,
+            VehicleId = vehicle.Id,
+            AssignedAtUtc = DateTime.UtcNow,
+            Status = "Active"
+        };
+
+        _db.ShipmentAssignments.Add(assignment);
+        shipment.Status = "Assigned";
+
+        _db.AuditLogs.Add(new AuditLog
+        {
+            UserId = UserId(),
+            Action = "SHIPMENT_DRIVER_ASSIGNED",
+            EntityType = "Shipment",
+            EntityId = shipment.Id.ToString(),
+            Details = $"DriverId={driver.Id}; VehicleId={vehicle.Id}",
+            CreatedAtUtc = DateTime.UtcNow
+        });
+
+        await _db.SaveChangesAsync();
+        await tx.CommitAsync();
+
+        return Ok(new
+        {
+            assignment.Id,
+            assignment.ShipmentId,
+            assignment.DriverId,
+            assignment.VehicleId,
+            shipment.Status
+        });
+    }
+}
+
+public sealed class VehicleRequest
+{
+    public string RegistrationNumber { get; set; } = "";
+    public string VehicleType { get; set; } = "";
+    public decimal CapacityKg { get; set; }
+}
+
+public sealed class DriverRequest
+{
+    public string FullName { get; set; } = "";
+    public string? Phone { get; set; }
+    public string LicenseNumber { get; set; } = "";
+}
+
+public sealed class AssignmentRequest
+{
+    public long ShipmentId { get; set; }
+    public long DriverId { get; set; }
+    public long VehicleId { get; set; }
+}
+
+public sealed class StatusRequest
+{
+    public string Status { get; set; } = "";
+}
+========== Controllers\AuthController.cs ==========
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Qubriq.API.DTOs.Auth;
+using Qubriq.API.Services;
+
+namespace Qubriq.API.Controllers;
+
+[ApiController]
+[Route("api/auth")]
+public class AuthController : ControllerBase
+{
+    private readonly AuthService _authService;
+
+    public AuthController(AuthService authService)
+    {
+        _authService = authService;
+    }
+
+    [AllowAnonymous]
+    [HttpPost("login")]
+    public async Task<IActionResult> Login(
+        [FromBody] LoginRequest request)
+    {
+        var result = await _authService.LoginAsync(request);
+
+        if (result == null)
+        {
+            return Unauthorized(new
+            {
+                message = "Invalid email or password, or the account is inactive."
+            });
+        }
+
+        return Ok(result);
+    }
+}
+========== Controllers\BookingsController.cs ==========
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Qubriq.API.Data;
+using Qubriq.API.DTOs;
+using Qubriq.API.Models;
+
+namespace Qubriq.API.Controllers;
+
+[ApiController]
+[Authorize]
+[Route("api/bookings")]
+public class BookingsController : ControllerBase
+{
+    private readonly QubriqDbContext _db;
+
+    public BookingsController(QubriqDbContext db)
+    {
+        _db = db;
+    }
+
+    private long? GetAuthenticatedUserId()
+    {
+        var subject =
+            User.FindFirst("sub")?.Value ??
+            User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (long.TryParse(subject, out var userId))
+        {
+            return userId;
+        }
+
+        return null;
+    }
+
+    private async Task<bool> HasPermissionAsync(
+        long userId,
+        string permissionCode)
+    {
+        return await _db.UserRoles
+            .Where(userRole => userRole.UserId == userId)
+            .Join(
+                _db.RolePermissions,
+                userRole => userRole.RoleId,
+                rolePermission => rolePermission.RoleId,
+                (userRole, rolePermission) => rolePermission)
+            .AnyAsync(rolePermission =>
+                rolePermission.IsAllowed &&
+                rolePermission.Permission.Code == permissionCode);
+    }
+
+    // GET: api/bookings
+    // Internal users see all permitted bookings.
+    // Booking customers see only their own bookings.
+    [HttpGet]
+    [Authorize(Policy = "BookingsRead")]
+    public async Task<IActionResult> GetBookings(
+        [FromQuery] string? status,
+        [FromQuery] string? search)
+    {
+        var userId = GetAuthenticatedUserId();
+
+        if (!userId.HasValue)
+        {
+            return Unauthorized();
+        }
+
+        var canReadAll = await HasPermissionAsync(
+            userId.Value,
+            "bookings.read_all");
+
+        var query = _db.Shipments
+            .AsNoTracking()
+            .Include(x => x.Customer)
+            .AsQueryable();
+
+        if (!canReadAll)
+        {
+            query = query.Where(x =>
+                x.Customer.UserId == userId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(status) &&
+            !status.Equals("All", StringComparison.OrdinalIgnoreCase))
+        {
+            query = query.Where(x => x.Status == status);
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+
+            query = query.Where(x =>
+                x.TrackingNumber.Contains(term) ||
+                x.Customer.CompanyName.Contains(term));
+        }
+
+        var bookings = await query
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .Select(x => new
+            {
+                x.Id,
+                bookingId = x.TrackingNumber,
+                customer = x.Customer.CompanyName,
+                pickupLocation = x.Origin,
+                deliveryLocation = x.Destination,
+                cargoType = x.CargoCategory,
+                cargoName = x.CargoName,
+                weight = x.TotalWeightKg,
+                x.PackageCount,
+                x.Priority,
+                bookingDate = x.CreatedAtUtc,
+                pickupDate = x.PickupDateUtc,
+                expectedDeliveryDate = x.ExpectedDeliveryUtc,
+                x.Status
+            })
+            .ToListAsync();
+
+        return Ok(bookings);
+    }
+
+    // GET: api/bookings/customers
+    // Only users with bookings.read_all can list customer records.
+    [HttpGet("customers")]
+    [Authorize(Policy = "BookingsReadAll")]
+    public async Task<IActionResult> GetCustomers()
+    {
+        var customers = await _db.Customers
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .OrderBy(x => x.CompanyName)
+            .Select(x => new
+            {
+                x.Id,
+                x.CompanyName,
+                x.ContactName,
+                x.Email,
+                x.Phone,
+                x.Address
+            })
+            .ToListAsync();
+
+        return Ok(customers);
+    }
+
+    // POST: api/bookings
+    [HttpPost]
+    [Authorize(Policy = "BookingsCreate")]
+    public async Task<IActionResult> CreateBooking(
+        [FromBody] CreateBookingRequest request)
+    {
+        var userId = GetAuthenticatedUserId();
+
+        if (!userId.HasValue)
+        {
+            return Unauthorized();
+        }
+
+        var canReadAll = await HasPermissionAsync(
+            userId.Value,
+            "bookings.read_all");
+
+        Customer? customer = null;
+
+        if (canReadAll)
+        {
+            if (!request.CustomerId.HasValue ||
+                request.CustomerId.Value <= 0)
+            {
+                return BadRequest(new
+                {
+                    message = "A valid customer must be selected."
+                });
+            }
+
+            customer = await _db.Customers
+                .FirstOrDefaultAsync(x =>
+                    x.Id == request.CustomerId.Value &&
+                    x.IsActive);
+        }
+        else
+        {
+            // Never trust a customer ID submitted by an external customer.
+            // Resolve the customer's own profile from the authenticated user.
+            customer = await _db.Customers
+                .FirstOrDefaultAsync(x =>
+                    x.UserId == userId.Value &&
+                    x.IsActive);
+        }
+
+        if (customer == null)
+        {
+            return BadRequest(new
+            {
+                message = canReadAll
+                    ? "Select an active customer before creating a booking."
+                    : "Your account does not have an active customer profile. Contact Qubriq support."
+            });
+        }
+
+        if (request.PickupDateUtc == default)
+        {
+            return BadRequest(new
+            {
+                message = "A valid pickup date is required."
+            });
+        }
+
+        if (request.ExpectedDeliveryUtc.HasValue &&
+            request.ExpectedDeliveryUtc.Value < request.PickupDateUtc)
+        {
+            return BadRequest(new
+            {
+                message = "Expected delivery cannot be earlier than pickup."
+            });
+        }
+
+        var trackingNumber =
+            $"QBR-{DateTime.UtcNow:yyyyMMdd}-" +
+            Guid.NewGuid().ToString("N")[..8].ToUpperInvariant();
+
+        var shipment = new Shipment
+        {
+            TrackingNumber = trackingNumber,
+            CustomerId = customer.Id,
+            Origin = request.Origin.Trim(),
+            Destination = request.Destination.Trim(),
+            Status = request.Status,
+            CreatedAtUtc = DateTime.UtcNow,
+            ExpectedDeliveryUtc = request.ExpectedDeliveryUtc,
+
+            CargoName = request.CargoName.Trim(),
+            CargoCategory = request.CargoCategory?.Trim(),
+            PackageCount = request.PackageCount,
+            TotalWeightKg = request.TotalWeightKg,
+            LengthCm = request.LengthCm,
+            WidthCm = request.WidthCm,
+            HeightCm = request.HeightCm,
+            IsFragile = request.IsFragile,
+            SpecialHandlingRequirements =
+                request.SpecialHandlingRequirements?.Trim(),
+
+            Priority = request.Priority,
+            PickupDateUtc = request.PickupDateUtc,
+            DeliveryTimeWindow = request.DeliveryTimeWindow?.Trim(),
+            AdditionalInstructions =
+                request.AdditionalInstructions?.Trim()
+        };
+
+        _db.Shipments.Add(shipment);
+
+        await _db.SaveChangesAsync();
+
+        return CreatedAtAction(
+            nameof(GetBookings),
+            new { },
+            new
+            {
+                shipment.Id,
+                shipment.TrackingNumber,
+                shipment.Status,
+                message = "Booking created successfully."
+            });
+    }
+}
+========== Controllers\RecipientShipmentsController.cs ==========
+using System.Data;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Qubriq.API.Data;
+using Qubriq.API.Models;
+
+namespace Qubriq.API.Controllers;
+
+[ApiController]
+[Authorize(Roles = "ShipmentRecipient")]
+[Route("api/recipient/shipments")]
+public class RecipientShipmentsController : ControllerBase
+{
+    private readonly QubriqDbContext _db;
+
+    public RecipientShipmentsController(QubriqDbContext db)
+    {
+        _db = db;
+    }
+
+    private long? UserId()
+    {
+        var value = User.FindFirst("sub")?.Value ??
+                    User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        return long.TryParse(value, out var id) ? id : null;
+    }
+
+    private async Task<User?> ActiveRecipient()
+    {
+        var id = UserId();
+        if (!id.HasValue) return null;
+
+        return await _db.Users
+            .FirstOrDefaultAsync(x => x.Id == id.Value && x.IsActive);
+    }
+
+    private async Task<bool> HasPermission(long id, string code)
+    {
+        return await _db.UserRoles
+            .Where(x => x.UserId == id)
+            .Join(_db.RolePermissions,
+                x => x.RoleId,
+                x => x.RoleId,
+                (_, p) => p)
+            .AnyAsync(x => x.IsAllowed && x.Permission.Code == code);
+    }
+
+    private IQueryable<Shipment> Scoped(User user)
+    {
+        if (user.RecipientType == "DeliveryPersonnel")
+        {
+            return _db.Shipments.Where(s =>
+                s.Assignments.Any(a =>
+                    a.Driver.UserId == user.Id &&
+                    a.Status == "Active" &&
+                    a.ReleasedAtUtc == null));
+        }
+
+        if (user.RecipientType == "FinalRecipient")
+        {
+            return _db.Shipments.Where(s =>
+                _db.ShipmentRecipients.Any(r =>
+                    r.ShipmentId == s.Id && r.UserId == user.Id));
+        }
+
+        return _db.Shipments.Where(s => false);
+    }
+
+    private static object ShipmentSummary(Shipment s) => new
+    {
+        s.Id,
+        s.TrackingNumber,
+        s.Origin,
+        s.Destination,
+        s.Status,
+        s.CreatedAtUtc,
+        s.ExpectedDeliveryUtc,
+        s.CargoName,
+        s.CargoCategory,
+        s.PackageCount,
+        s.TotalWeightKg,
+        s.DeliveryTimeWindow
+    };
+
+    [HttpGet]
+    public async Task<IActionResult> GetMine()
+    {
+        var user = await ActiveRecipient();
+        if (user == null) return Forbid();
+
+        var permission = user.RecipientType == "DeliveryPersonnel"
+            ? "delivery.assigned.read"
+            : user.RecipientType == "FinalRecipient"
+                ? "delivery.incoming.read"
+                : "";
+
+        if (permission == "" || !await HasPermission(user.Id, permission))
+            return Forbid();
+
+        var items = await Scoped(user)
+            .AsNoTracking()
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .Select(x => new
+            {
+                x.Id,
+                x.TrackingNumber,
+                x.Origin,
+                x.Destination,
+                x.Status,
+                x.CreatedAtUtc,
+                x.ExpectedDeliveryUtc,
+                x.CargoName,
+                x.CargoCategory,
+                x.PackageCount,
+                x.TotalWeightKg,
+                x.DeliveryTimeWindow
+            })
+            .ToListAsync();
+
+        return Ok(items);
+    }
+
+    [HttpGet("{id:long}")]
+    public async Task<IActionResult> GetOne(long id)
+    {
+        var user = await ActiveRecipient();
+        if (user == null) return Forbid();
+
+        var permission = user.RecipientType == "DeliveryPersonnel"
+            ? "delivery.assigned.read"
+            : user.RecipientType == "FinalRecipient"
+                ? "delivery.incoming.read"
+                : "";
+
+        if (permission == "" || !await HasPermission(user.Id, permission))
+            return Forbid();
+
+        var shipment = await Scoped(user)
+            .AsNoTracking()
+            .Where(x => x.Id == id)
+            .Select(x => new
+            {
+                x.Id,
+                x.TrackingNumber,
+                x.Origin,
+                x.Destination,
+                x.Status,
+                x.CreatedAtUtc,
+                x.ExpectedDeliveryUtc,
+                x.CargoName,
+                x.CargoCategory,
+                x.PackageCount,
+                x.TotalWeightKg,
+                x.LengthCm,
+                x.WidthCm,
+                x.HeightCm,
+                x.IsFragile,
+                x.Priority,
+                x.PickupDateUtc,
+                x.DeliveryTimeWindow
+            })
+            .FirstOrDefaultAsync();
+
+        return shipment == null ? NotFound() : Ok(shipment);
+    }
+
+    public sealed class StatusRequest
+    {
+        public string Status { get; set; } = "";
+    }
+
+    [HttpPatch("{id:long}/status")]
+    public async Task<IActionResult> UpdateStatus(
+        long id,
+        [FromBody] StatusRequest request)
+    {
+        var user = await ActiveRecipient();
+        if (user == null || user.RecipientType != "DeliveryPersonnel")
+            return Forbid();
+
+        if (!await HasPermission(user.Id, "delivery.status.update"))
+            return Forbid();
+
+        var shipment = await Scoped(user)
+            .FirstOrDefaultAsync(x => x.Id == id);
+
+        if (shipment == null) return NotFound();
+
+        var allowed = new Dictionary<string, string[]>
+        {
+            ["Assigned"] = new[] { "PickedUp" },
+            ["PickedUp"] = new[] { "InTransit" },
+            ["InTransit"] = new[] { "Delivered" }
+        };
+
+        if (string.IsNullOrWhiteSpace(request.Status) ||
+            !allowed.TryGetValue(shipment.Status, out var next))
+            return BadRequest(new { message = "Invalid shipment status transition." });
+
+        var canonicalStatus = next.FirstOrDefault(
+            x => string.Equals(x, request.Status.Trim(), StringComparison.OrdinalIgnoreCase));
+
+        if (canonicalStatus == null)
+            return BadRequest(new { message = "Invalid shipment status transition." });
+
+        var oldStatus = shipment.Status;
+        shipment.Status = canonicalStatus;
+
+        _db.AuditLogs.Add(new AuditLog
+        {
+            UserId = user.Id,
+            Action = "SHIPMENT_STATUS_CHANGED",
+            EntityType = "Shipment",
+            EntityId = shipment.Id.ToString(),
+            Details = $"From={oldStatus}; To={request.Status}",
+            CreatedAtUtc = DateTime.UtcNow
+        });
+
+        await _db.SaveChangesAsync();
+
+        return Ok(new { shipment.Id, shipment.TrackingNumber, shipment.Status });
+    }
+
+    public sealed class ProofRequest
+    {
+        public string ProofType { get; set; } = "";
+        public string? FileReference { get; set; }
+        public string? Remarks { get; set; }
+    }
+
+    [HttpPost("{id:long}/proof")]
+    public async Task<IActionResult> SubmitProof(
+        long id,
+        [FromBody] ProofRequest request)
+    {
+        var user = await ActiveRecipient();
+        if (user == null || user.RecipientType != "DeliveryPersonnel")
+            return Forbid();
+
+        if (!await HasPermission(user.Id, "delivery.proof.submit"))
+            return Forbid();
+
+        var shipment = await Scoped(user)
+            .FirstOrDefaultAsync(x => x.Id == id);
+
+        if (shipment == null) return NotFound();
+
+        if (shipment.Status != "Delivered")
+            return BadRequest(new { message = "Proof can only be submitted after Delivered status." });
+
+        if (string.IsNullOrWhiteSpace(request.ProofType))
+            return BadRequest(new { message = "Invalid proof type." });
+
+        var type = request.ProofType.Trim();
+
+        if (type.Length > 50)
+            return BadRequest(new { message = "Invalid proof type." });
+
+        if (request.FileReference?.Length > 500 ||
+            request.Remarks?.Length > 1000)
+            return BadRequest(new { message = "Proof metadata exceeds allowed length." });
+
+        var proof = new DeliveryProof
+        {
+            ShipmentId = shipment.Id,
+            SubmittedByUserId = user.Id,
+            ProofType = type,
+            FileReference = request.FileReference?.Trim(),
+            Remarks = request.Remarks?.Trim(),
+            SubmittedAtUtc = DateTime.UtcNow
+        };
+
+        _db.DeliveryProofs.Add(proof);
+
+        _db.AuditLogs.Add(new AuditLog
+        {
+            UserId = user.Id,
+            Action = "DELIVERY_PROOF_SUBMITTED",
+            EntityType = "Shipment",
+            EntityId = shipment.Id.ToString(),
+            Details = $"ProofType={type}; ProofId={proof.Id}",
+            CreatedAtUtc = DateTime.UtcNow
+        });
+
+        await _db.SaveChangesAsync();
+
+        return Ok(new { proof.Id, proof.ShipmentId, proof.ProofType, proof.SubmittedAtUtc });
+    }
+
+    [HttpGet("{id:long}/tracking")]
+    public async Task<IActionResult> GetTracking(long id)
+    {
+        var user = await ActiveRecipient();
+        if (user == null) return Forbid();
+
+        var permission = user.RecipientType == "DeliveryPersonnel"
+            ? "delivery.assigned.read"
+            : user.RecipientType == "FinalRecipient"
+                ? "tracking.view_own"
+                : "";
+
+        if (permission == "" || !await HasPermission(user.Id, permission))
+            return Forbid();
+
+        var shipment = await Scoped(user)
+            .AsNoTracking()
+            .Where(x => x.Id == id)
+            .Select(x => new
+            {
+                x.Id,
+                x.TrackingNumber,
+                x.Status,
+                x.CreatedAtUtc,
+                x.ExpectedDeliveryUtc
+            })
+            .FirstOrDefaultAsync();
+
+        if (shipment == null) return NotFound();
+
+        var history = await _db.AuditLogs
+            .AsNoTracking()
+            .Where(x =>
+                x.EntityType == "Shipment" &&
+                x.EntityId == id.ToString() &&
+                x.Action == "SHIPMENT_STATUS_CHANGED")
+            .OrderBy(x => x.CreatedAtUtc)
+            .Select(x => new
+            {
+                x.Action,
+                x.Details,
+                x.CreatedAtUtc
+            })
+            .ToListAsync();
+
+        return Ok(new { shipment, history });
+    }
+
+    [HttpPost("{id:long}/confirm-receipt")]
+    public async Task<IActionResult> ConfirmReceipt(long id)
+    {
+        var user = await ActiveRecipient();
+        if (user == null || user.RecipientType != "FinalRecipient")
+            return Forbid();
+
+        if (!await HasPermission(user.Id, "delivery.receipt.confirm"))
+            return Forbid();
+
+        var shipment = await Scoped(user)
+            .FirstOrDefaultAsync(x => x.Id == id);
+
+        if (shipment == null) return NotFound();
+
+        if (shipment.Status != "Delivered")
+            return BadRequest(new { message = "Only delivered shipments can be confirmed." });
+
+        await using var transaction =
+            await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+
+        var alreadyConfirmed = await _db.AuditLogs.AnyAsync(x =>
+            x.UserId == user.Id &&
+            x.Action == "SHIPMENT_RECEIPT_CONFIRMED" &&
+            x.EntityType == "Shipment" &&
+            x.EntityId == id.ToString());
+
+        if (alreadyConfirmed)
+            return Conflict(new { message = "Receipt has already been confirmed." });
+
+        var confirmedAtUtc = DateTime.UtcNow;
+
+        _db.AuditLogs.Add(new AuditLog
+        {
+            UserId = user.Id,
+            Action = "SHIPMENT_RECEIPT_CONFIRMED",
+            EntityType = "Shipment",
+            EntityId = id.ToString(),
+            Details = $"ConfirmedByUserId={user.Id}",
+            CreatedAtUtc = confirmedAtUtc
+        });
+
+        await _db.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        return Ok(new
+        {
+            message = "Shipment receipt confirmed.",
+            shipmentId = id,
+            confirmedAtUtc
+        });
+    }
+}
+========== Controllers\AdminShipmentAssignmentsController.cs ==========
+using System.Data;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Qubriq.API.Data;
+using Qubriq.API.Models;
+
+namespace Qubriq.API.Controllers;
+
+[ApiController]
+[Route("api/admin/shipment-assignments")]
+[Authorize(Roles = "Admin,OperationsDispatcher")]
+public class AdminShipmentAssignmentsController : ControllerBase
+{
+    private readonly QubriqDbContext _db;
+
+    public AdminShipmentAssignmentsController(QubriqDbContext db)
+    {
+        _db = db;
+    }
+
+    private long? AdminId()
+    {
+        var value = User.FindFirst("sub")?.Value ??
+                    User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        return long.TryParse(value, out var id) ? id : null;
+    }
+
+    private async Task<bool> HasPermission(string code)
+    {
+        var id = AdminId();
+        if (!id.HasValue) return false;
+
+        return await _db.UserRoles
+            .Where(x => x.UserId == id.Value)
+            .Join(_db.RolePermissions,
+                x => x.RoleId,
+                x => x.RoleId,
+                (_, p) => p)
+            .AnyAsync(x => x.IsAllowed && x.Permission.Code == code);
+    }
+
+    public sealed class DriverAssignmentRequest
+    {
+        public long ShipmentId { get; set; }
+        public long DriverId { get; set; }
+        public long VehicleId { get; set; }
+    }
+
+    [HttpPost("driver")]
+    public async Task<IActionResult> AssignDriver(
+        [FromBody] DriverAssignmentRequest request)
+    {
+        if (!await HasPermission("delivery.assignments.manage"))
+            return Forbid();
+
+        await using var transaction =
+            await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+
+        var shipment = await _db.Shipments
+            .FirstOrDefaultAsync(x => x.Id == request.ShipmentId);
+
+        if (shipment == null)
+            return NotFound(new { message = "Shipment not found." });
+
+        var driver = await _db.Drivers
+            .FirstOrDefaultAsync(x => x.Id == request.DriverId);
+
+        var vehicle = await _db.Vehicles
+            .FirstOrDefaultAsync(x => x.Id == request.VehicleId);
+
+        if (driver == null || vehicle == null)
+            return BadRequest(new { message = "Valid driver and vehicle are required." });
+
+        if (driver.Status != "Available" || vehicle.Status != "Available")
+            return Conflict(new { message = "Driver and vehicle must be Available." });
+
+        var shipmentAlreadyAssigned = await _db.ShipmentAssignments.AnyAsync(x =>
+            x.ShipmentId == request.ShipmentId &&
+            x.Status == "Active" &&
+            x.ReleasedAtUtc == null);
+
+        if (shipmentAlreadyAssigned)
+            return Conflict(new { message = "Shipment already has an active assignment." });
+
+        var driverAlreadyAssigned = await _db.ShipmentAssignments.AnyAsync(x =>
+            x.DriverId == request.DriverId &&
+            x.Status == "Active" &&
+            x.ReleasedAtUtc == null);
+
+        if (driverAlreadyAssigned)
+            return Conflict(new { message = "Driver already has an active assignment." });
+
+        var vehicleAlreadyAssigned = await _db.ShipmentAssignments.AnyAsync(x =>
+            x.VehicleId == request.VehicleId &&
+            x.Status == "Active" &&
+            x.ReleasedAtUtc == null);
+
+        if (vehicleAlreadyAssigned)
+            return Conflict(new { message = "Vehicle already has an active assignment." });
+
+        var assignment = new ShipmentAssignment
+        {
+            ShipmentId = shipment.Id,
+            DriverId = driver.Id,
+            VehicleId = vehicle.Id,
+            AssignedAtUtc = DateTime.UtcNow,
+            Status = "Active"
+        };
+
+        _db.ShipmentAssignments.Add(assignment);
+
+        shipment.Status = "Assigned";
+
+        _db.AuditLogs.Add(new AuditLog
+        {
+            UserId = AdminId(),
+            Action = "SHIPMENT_DRIVER_ASSIGNED",
+            EntityType = "Shipment",
+            EntityId = shipment.Id.ToString(),
+            Details = $"AssignmentId={assignment.Id}; DriverId={driver.Id}; VehicleId={vehicle.Id}",
+            CreatedAtUtc = DateTime.UtcNow
+        });
+
+        await _db.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        return Ok(new
+        {
+            assignment.Id,
+            assignment.ShipmentId,
+            assignment.DriverId,
+            assignment.VehicleId,
+            shipment.Status
+        });
+    }
+
+    public sealed class FinalRecipientRequest
+    {
+        public long ShipmentId { get; set; }
+        public long RecipientUserId { get; set; }
+    }
+
+    [HttpPost("recipient")]
+    public async Task<IActionResult> AssignFinalRecipient(
+        [FromBody] FinalRecipientRequest request)
+    {
+        if (!await HasPermission("delivery.assignments.manage"))
+            return Forbid();
+
+        await using var transaction =
+            await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+
+        var user = await _db.Users
+            .FirstOrDefaultAsync(x =>
+                x.Id == request.RecipientUserId &&
+                x.IsActive &&
+                x.RecipientType == "FinalRecipient");
+
+        if (user == null)
+            return BadRequest(new { message = "Active FinalRecipient account not found." });
+
+        var shipmentExists = await _db.Shipments
+            .AnyAsync(x => x.Id == request.ShipmentId);
+
+        if (!shipmentExists)
+            return NotFound(new { message = "Shipment not found." });
+
+        if (await _db.ShipmentRecipients.AnyAsync(x =>
+            x.ShipmentId == request.ShipmentId &&
+            x.UserId == request.RecipientUserId))
+            return Conflict(new { message = "Recipient is already linked to this shipment." });
+
+        _db.ShipmentRecipients.Add(new ShipmentRecipient
+        {
+            ShipmentId = request.ShipmentId,
+            UserId = request.RecipientUserId,
+            CreatedAtUtc = DateTime.UtcNow
+        });
+
+        _db.AuditLogs.Add(new AuditLog
+        {
+            UserId = AdminId(),
+            Action = "FINAL_RECIPIENT_ASSIGNED",
+            EntityType = "Shipment",
+            EntityId = request.ShipmentId.ToString(),
+            Details = $"RecipientUserId={request.RecipientUserId}",
+            CreatedAtUtc = DateTime.UtcNow
+        });
+
+        await _db.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        return Ok(new { message = "Final recipient linked to shipment." });
+    }
+}
+========== DTOs\Admin\CreateCustomerAccountRequest.cs ==========
+using System.ComponentModel.DataAnnotations;
+
+namespace Qubriq.API.DTOs.Admin;
+
+public class CreateCustomerAccountRequest
+{
+    [Required]
+    [StringLength(150, MinimumLength = 2)]
+    public string FullName { get; set; } = string.Empty;
+
+    [Required]
+    [EmailAddress]
+    [StringLength(254)]
+    public string Email { get; set; } = string.Empty;
+
+    [Required]
+    [StringLength(128, MinimumLength = 12)]
+    public string Password { get; set; } = string.Empty;
+}
+========== DTOs\CreateCustomerRequest.cs ==========
+using System.ComponentModel.DataAnnotations;
+
+namespace Qubriq.API.DTOs;
+
+public class CreateCustomerRequest
+{
+    [Required]
+    [StringLength(200, MinimumLength = 2)]
+    public string CompanyName { get; set; } = string.Empty;
+
+    [StringLength(150)]
+    public string? ContactName { get; set; }
+
+    [EmailAddress]
+    [StringLength(254)]
+    public string? Email { get; set; }
+
+    [Phone]
+    [StringLength(30)]
+    public string? Phone { get; set; }
+
+    [StringLength(500)]
+    public string? Address { get; set; }
+}
+========== DTOs\CreateBookingRequest.cs ==========
+using System.ComponentModel.DataAnnotations;
+
+namespace Qubriq.API.DTOs;
+
+public class CreateBookingRequest
+{
+    [Range(1, long.MaxValue)]
+    public long? CustomerId { get; set; }
+
+    [Required]
+    [StringLength(250)]
+    public string Origin { get; set; } = string.Empty;
+
+    [Required]
+    [StringLength(250)]
+    public string Destination { get; set; } = string.Empty;
+
+    [Required]
+    [StringLength(200)]
+    public string CargoName { get; set; } = string.Empty;
+
+    [StringLength(100)]
+    public string? CargoCategory { get; set; }
+
+    [Range(1, int.MaxValue)]
+    public int PackageCount { get; set; }
+
+    [Range(typeof(decimal), "0.01", "9999999999")]
+    public decimal TotalWeightKg { get; set; }
+
+    [Range(typeof(decimal), "0.01", "99999999")]
+    public decimal? LengthCm { get; set; }
+
+    [Range(typeof(decimal), "0.01", "99999999")]
+    public decimal? WidthCm { get; set; }
+
+    [Range(typeof(decimal), "0.01", "99999999")]
+    public decimal? HeightCm { get; set; }
+
+    public bool IsFragile { get; set; }
+
+    [StringLength(500)]
+    public string? SpecialHandlingRequirements { get; set; }
+
+    [Required]
+    [RegularExpression("^(Low|Normal|High|Urgent)$")]
+    public string Priority { get; set; } = "Normal";
+
+    public DateTime PickupDateUtc { get; set; }
+
+    public DateTime? ExpectedDeliveryUtc { get; set; }
+
+    [StringLength(100)]
+    public string? DeliveryTimeWindow { get; set; }
+
+    [StringLength(1000)]
+    public string? AdditionalInstructions { get; set; }
+
+    [RegularExpression("^(Draft|Confirmed)$")]
+    public string Status { get; set; } = "Confirmed";
+}

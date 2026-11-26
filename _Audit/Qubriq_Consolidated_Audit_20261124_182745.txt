@@ -1,0 +1,108 @@
+﻿QUBRIQ CONSOLIDATED AUDIT
+Generated: 2026-11-24T18:28:31.5438765+05:30
+Project: S:\Project_Qubriq
+API: http://127.0.0.1:5066
+Frontend: http://127.0.0.1:5173
+PASS=38 FAIL=0 BLOCKED=0 REVIEW=1 SKIPPED=0
+
+RESULTS
+
+Test                                                Status Detail                                                      
+----                                                ------ ------                                                      
+Git status readable                                 PASS   ## subhodhraj...origin/subhodhraj |  M frontend/vite.conf...
+Protected artifact present                          PASS   PHASE1_SOURCE_AUDIT.txt                                     
+Protected artifact present                          PASS   qubriq_dev_backup_20261124_110950.sql                       
+Vite proxy target                                   PASS   Proxy references API port 5066.                             
+OperationsDispatcher source candidate               REVIEW Candidate file: . Manual route/authorization/transaction ...
+OperationsDispatcher role seed                      PASS   Role is referenced in RBAC seed SQL; this does not prove ...
+.NET build                                          PASS   dotnet build --no-restore                                   
+Frontend build                                      PASS   npm run build                                               
+API root                                            PASS   HTTP 200                                                    
+API health                                          PASS   HTTP 200                                                    
+MySQL connectivity                                  PASS   HTTP 200                                                    
+Frontend HTTP                                       PASS   HTTP 200                                                    
+Existing Admin login                                PASS   HTTP 200                                                    
+Admin can list customers                            PASS   HTTP 200                                                    
+Admin can access dispatcher dashboard               PASS   HTTP 200                                                    
+Admin can read fleet vehicles                       PASS   HTTP 200                                                    
+Admin blocked from recipient-only endpoint          PASS   HTTP 403                                                    
+Anonymous blocked from customer list                PASS   HTTP 401                                                    
+Anonymous blocked from dispatcher dashboard         PASS   HTTP 401                                                    
+Anonymous blocked from recipient shipments          PASS   HTTP 401                                                    
+Create disposable customer profile                  PASS   HTTP 201                                                    
+Provision BookingCustomer account                   PASS   HTTP 200                                                    
+New BookingCustomer login                           PASS   HTTP 200                                                    
+BookingCustomer can read own bookings               PASS   HTTP 200                                                    
+BookingCustomer blocked from all-customer listing   PASS   HTTP 403                                                    
+BookingCustomer blocked from Admin customer API     PASS   HTTP 403                                                    
+BookingCustomer blocked from dispatcher dashboard   PASS   HTTP 403                                                    
+Create disposable driver for DeliveryPersonnel      PASS   HTTP 201                                                    
+Provision DeliveryPersonnel account                 PASS   HTTP 201                                                    
+New DeliveryPersonnel login                         PASS   HTTP 200                                                    
+DeliveryPersonnel can read assigned shipments       PASS   HTTP 200                                                    
+DeliveryPersonnel blocked from dispatcher dashboard PASS   HTTP 403                                                    
+DeliveryPersonnel blocked from fleet API            PASS   HTTP 403                                                    
+Provision FinalRecipient account                    PASS   HTTP 201                                                    
+New FinalRecipient login                            PASS   HTTP 200                                                    
+FinalRecipient can read incoming shipments          PASS   HTTP 200                                                    
+FinalRecipient blocked from dispatcher dashboard    PASS   HTTP 403                                                    
+FinalRecipient blocked from fleet API               PASS   HTTP 403                                                    
+Test credentials protected                          PASS   DPAPI-encrypted credentials saved to S:\Project_Qubriq\_A...
+
+
+
+
+EVENT LOG
+[18.27.45] QUBRIQ CONSOLIDATED AUDIT STARTED
+[18.27.45] Root: S:\Project_Qubriq
+[18.27.45] API: http://127.0.0.1:5066 | Frontend: http://127.0.0.1:5173
+[18.27.45] Safety: no deletes, no SQL writes, no modifications to existing accounts or Git history.
+[18.27.46] PASS: Git status readable - ## subhodhraj...origin/subhodhraj |  M frontend/vite.config.js | ?? Qubriq_PreAudit.ps1 | ?? _Audit/
+[18.27.46] PASS: Protected artifact present - PHASE1_SOURCE_AUDIT.txt
+[18.27.46] PASS: Protected artifact present - qubriq_dev_backup_20261124_110950.sql
+[18.27.46] PASS: Vite proxy target - Proxy references API port 5066.
+[18.27.46] Inspecting source for OperationsDispatcher provisioning...
+[18.27.46] REVIEW: OperationsDispatcher source candidate - Candidate file: . Manual route/authorization/transaction review required; no account created.
+[18.27.46] PASS: OperationsDispatcher role seed - Role is referenced in RBAC seed SQL; this does not prove an account provisioning endpoint exists.
+[18.27.46] Building .NET API...
+[18.27.47] PASS: .NET build - dotnet build --no-restore
+[18.27.47] Building React frontend...
+[18.27.49] PASS: Frontend build - npm run build
+[18.27.49] PASS: API root - HTTP 200
+[18.27.49] PASS: API health - HTTP 200
+[18.27.51] PASS: MySQL connectivity - HTTP 200
+[18.27.51] PASS: Frontend HTTP - HTTP 200
+[18.28.30] PASS: Existing Admin login - HTTP 200
+[18.28.30] PASS: Admin can list customers - HTTP 200
+[18.28.30] PASS: Admin can access dispatcher dashboard - HTTP 200
+[18.28.30] PASS: Admin can read fleet vehicles - HTTP 200
+[18.28.30] PASS: Admin blocked from recipient-only endpoint - HTTP 403
+[18.28.30] PASS: Anonymous blocked from customer list - HTTP 401
+[18.28.30] PASS: Anonymous blocked from dispatcher dashboard - HTTP 401
+[18.28.30] PASS: Anonymous blocked from recipient shipments - HTTP 401
+[18.28.30] PASS: Create disposable customer profile - HTTP 201
+[18.28.30] PASS: Provision BookingCustomer account - HTTP 200
+[18.28.30] PASS: New BookingCustomer login - HTTP 200
+[18.28.30] PASS: BookingCustomer can read own bookings - HTTP 200
+[18.28.30] PASS: BookingCustomer blocked from all-customer listing - HTTP 403
+[18.28.30] PASS: BookingCustomer blocked from Admin customer API - HTTP 403
+[18.28.30] PASS: BookingCustomer blocked from dispatcher dashboard - HTTP 403
+[18.28.31] PASS: Create disposable driver for DeliveryPersonnel - HTTP 201
+[18.28.31] PASS: Provision DeliveryPersonnel account - HTTP 201
+[18.28.31] PASS: New DeliveryPersonnel login - HTTP 200
+[18.28.31] PASS: DeliveryPersonnel can read assigned shipments - HTTP 200
+[18.28.31] PASS: DeliveryPersonnel blocked from dispatcher dashboard - HTTP 403
+[18.28.31] PASS: DeliveryPersonnel blocked from fleet API - HTTP 403
+[18.28.31] PASS: Provision FinalRecipient account - HTTP 201
+[18.28.31] PASS: New FinalRecipient login - HTTP 200
+[18.28.31] PASS: FinalRecipient can read incoming shipments - HTTP 200
+[18.28.31] PASS: FinalRecipient blocked from dispatcher dashboard - HTTP 403
+[18.28.31] PASS: FinalRecipient blocked from fleet API - HTTP 403
+[18.28.31] PASS: Test credentials protected - DPAPI-encrypted credentials saved to S:\Project_Qubriq\_Audit\Qubriq_Autotest_Credentials_20261124_182745.clixml (current Windows user only).
+[18.28.31] ========== AUDIT SUMMARY ==========
+[18.28.31] PASS=38 | FAIL=0 | BLOCKED=0 | REVIEW=1 | SKIPPED=0
+[18.28.31] Test accounts, if provisioned, are intentionally retained.
+[18.28.31] No source files, build folders, database rows, existing accounts, backups, or Git history were deleted.
+[18.28.31] OperationsDispatcher account creation was not attempted; inspect candidate source and confirm a supported endpoint first.
+[18.28.31] Report: S:\Project_Qubriq\_Audit\Qubriq_Consolidated_Audit_20261124_182745.txt
+[18.28.31] Credentials file (encrypted): S:\Project_Qubriq\_Audit\Qubriq_Autotest_Credentials_20261124_182745.clixml

@@ -52,6 +52,7 @@ VALUES
 ('fleet.vehicles.manage', 'Fleet', 'ManageVehicles', 'Manage vehicles'),
 ('fleet.drivers.manage', 'Fleet', 'ManageDrivers', 'Manage drivers'),
 ('fleet.assignments.manage', 'Fleet', 'ManageAssignments', 'Assign shipments, drivers and vehicles'),
+('fleet.load_optimization.run', 'Fleet', 'RunLoadOptimization', 'Run 3D cargo load optimization'),
 
 ('routes.plan', 'Routes', 'Plan', 'Plan shipment routes'),
 
@@ -119,6 +120,7 @@ JOIN Permissions p
         'fleet.vehicles.manage',
         'fleet.drivers.manage',
         'fleet.assignments.manage',
+        'fleet.load_optimization.run',
         'routes.plan',
         'compliance.ewaybill.manage',
         'tracking.view_all',
@@ -181,3 +183,4 @@ ON DUPLICATE KEY UPDATE
 IsAllowed = TRUE;
 
 COMMIT;
+

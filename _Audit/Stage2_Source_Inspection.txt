@@ -1,0 +1,980 @@
+﻿QUBRIQ STAGE 2 - SOURCE INSPECTION
+
+
+==========================================================================================
+FILE: backend\Qubriq.API\DTOs\CreateBookingRequest.cs
+==========================================================================================
+    1: using System.ComponentModel.DataAnnotations;
+    2: 
+    3: namespace Qubriq.API.DTOs;
+    4: 
+    5: public class CreateBookingRequest
+    6: {
+    7:     [Range(1, long.MaxValue)]
+    8:     public long? CustomerId { get; set; }
+    9: 
+   10:     [Required]
+   11:     [StringLength(250)]
+   12:     public string Origin { get; set; } = string.Empty;
+   13: 
+   14:     [Required]
+   15:     [StringLength(250)]
+   16:     public string Destination { get; set; } = string.Empty;
+   17: 
+   18:     [Required]
+   19:     [StringLength(200)]
+   20:     public string CargoName { get; set; } = string.Empty;
+   21: 
+   22:     [StringLength(100)]
+   23:     public string? CargoCategory { get; set; }
+   24: 
+   25:     [Range(1, int.MaxValue)]
+   26:     public int PackageCount { get; set; }
+   27: 
+   28:     [Range(typeof(decimal), "0.01", "9999999999")]
+   29:     public decimal TotalWeightKg { get; set; }
+   30: 
+   31:     [Range(typeof(decimal), "0.01", "99999999")]
+   32:     public decimal? LengthCm { get; set; }
+   33: 
+   34:     [Range(typeof(decimal), "0.01", "99999999")]
+   35:     public decimal? WidthCm { get; set; }
+   36: 
+   37:     [Range(typeof(decimal), "0.01", "99999999")]
+   38:     public decimal? HeightCm { get; set; }
+   39: 
+   40:     public bool IsFragile { get; set; }
+   41: 
+   42:     [StringLength(500)]
+   43:     public string? SpecialHandlingRequirements { get; set; }
+   44: 
+   45:     [Required]
+   46:     [RegularExpression("^(Low|Normal|High|Urgent)$")]
+   47:     public string Priority { get; set; } = "Normal";
+   48: 
+   49:     public DateTime PickupDateUtc { get; set; }
+   50: 
+   51:     public DateTime? ExpectedDeliveryUtc { get; set; }
+   52: 
+   53:     [StringLength(100)]
+   54:     public string? DeliveryTimeWindow { get; set; }
+   55: 
+   56:     [StringLength(1000)]
+   57:     public string? AdditionalInstructions { get; set; }
+   58: 
+   59:     [RegularExpression("^(Draft|Confirmed)$")]
+   60:     public string Status { get; set; } = "Confirmed";
+   61: }
+
+
+==========================================================================================
+FILE: backend\Qubriq.API\Controllers\BookingsController.cs
+==========================================================================================
+    1: using System.Security.Claims;
+    2: using Microsoft.AspNetCore.Authorization;
+    3: using Microsoft.AspNetCore.Mvc;
+    4: using Microsoft.EntityFrameworkCore;
+    5: using Qubriq.API.Data;
+    6: using Qubriq.API.DTOs;
+    7: using Qubriq.API.Models;
+    8: 
+    9: namespace Qubriq.API.Controllers;
+   10: 
+   11: [ApiController]
+   12: [Authorize]
+   13: [Route("api/bookings")]
+   14: public class BookingsController : ControllerBase
+   15: {
+   16:     private readonly QubriqDbContext _db;
+   17: 
+   18:     public BookingsController(QubriqDbContext db)
+   19:     {
+   20:         _db = db;
+   21:     }
+   22: 
+   23:     private long? GetAuthenticatedUserId()
+   24:     {
+   25:         var subject =
+   26:             User.FindFirst("sub")?.Value ??
+   27:             User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+   28: 
+   29:         if (long.TryParse(subject, out var userId))
+   30:         {
+   31:             return userId;
+   32:         }
+   33: 
+   34:         return null;
+   35:     }
+   36: 
+   37:     private async Task<bool> HasPermissionAsync(
+   38:         long userId,
+   39:         string permissionCode)
+   40:     {
+   41:         return await _db.UserRoles
+   42:             .Where(userRole => userRole.UserId == userId)
+   43:             .Join(
+   44:                 _db.RolePermissions,
+   45:                 userRole => userRole.RoleId,
+   46:                 rolePermission => rolePermission.RoleId,
+   47:                 (userRole, rolePermission) => rolePermission)
+   48:             .AnyAsync(rolePermission =>
+   49:                 rolePermission.IsAllowed &&
+   50:                 rolePermission.Permission.Code == permissionCode);
+   51:     }
+   52: 
+   53:     // GET: api/bookings
+   54:     // Internal users see all permitted bookings.
+   55:     // Booking customers see only their own bookings.
+   56:     [HttpGet]
+   57:     [Authorize(Policy = "BookingsRead")]
+   58:     public async Task<IActionResult> GetBookings(
+   59:         [FromQuery] string? status,
+   60:         [FromQuery] string? search)
+   61:     {
+   62:         var userId = GetAuthenticatedUserId();
+   63: 
+   64:         if (!userId.HasValue)
+   65:         {
+   66:             return Unauthorized();
+   67:         }
+   68: 
+   69:         var canReadAll = await HasPermissionAsync(
+   70:             userId.Value,
+   71:             "bookings.read_all");
+   72: 
+   73:         var query = _db.Shipments
+   74:             .AsNoTracking()
+   75:             .Include(x => x.Customer)
+   76:             .AsQueryable();
+   77: 
+   78:         if (!canReadAll)
+   79:         {
+   80:             query = query.Where(x =>
+   81:                 x.Customer.UserId == userId.Value);
+   82:         }
+   83: 
+   84:         if (!string.IsNullOrWhiteSpace(status) &&
+   85:             !status.Equals("All", StringComparison.OrdinalIgnoreCase))
+   86:         {
+   87:             query = query.Where(x => x.Status == status);
+   88:         }
+   89: 
+   90:         if (!string.IsNullOrWhiteSpace(search))
+   91:         {
+   92:             var term = search.Trim();
+   93: 
+   94:             query = query.Where(x =>
+   95:                 x.TrackingNumber.Contains(term) ||
+   96:                 x.Customer.CompanyName.Contains(term));
+   97:         }
+   98: 
+   99:         var bookings = await query
+  100:             .OrderByDescending(x => x.CreatedAtUtc)
+  101:             .Select(x => new
+  102:             {
+  103:                 x.Id,
+  104:                 bookingId = x.TrackingNumber,
+  105:                 customer = x.Customer.CompanyName,
+  106:                 pickupLocation = x.Origin,
+  107:                 deliveryLocation = x.Destination,
+  108:                 cargoType = x.CargoCategory,
+  109:                 cargoName = x.CargoName,
+  110:                 weight = x.TotalWeightKg,
+  111:                 x.PackageCount,
+  112:                 x.Priority,
+  113:                 bookingDate = x.CreatedAtUtc,
+  114:                 pickupDate = x.PickupDateUtc,
+  115:                 expectedDeliveryDate = x.ExpectedDeliveryUtc,
+  116:                 x.Status
+  117:             })
+  118:             .ToListAsync();
+  119: 
+  120:         return Ok(bookings);
+  121:     }
+  122: 
+  123:     // GET: api/bookings/customers
+  124:     // Only users with bookings.read_all can list customer records.
+  125:     [HttpGet("customers")]
+  126:     [Authorize(Policy = "BookingsReadAll")]
+  127:     public async Task<IActionResult> GetCustomers()
+  128:     {
+  129:         var customers = await _db.Customers
+  130:             .AsNoTracking()
+  131:             .Where(x => x.IsActive)
+  132:             .OrderBy(x => x.CompanyName)
+  133:             .Select(x => new
+  134:             {
+  135:                 x.Id,
+  136:                 x.CompanyName,
+  137:                 x.ContactName,
+  138:                 x.Email,
+  139:                 x.Phone,
+  140:                 x.Address
+  141:             })
+  142:             .ToListAsync();
+  143: 
+  144:         return Ok(customers);
+  145:     }
+  146: 
+  147:     // POST: api/bookings
+  148:     [HttpPost]
+  149:     [Authorize(Policy = "BookingsCreate")]
+  150:     public async Task<IActionResult> CreateBooking(
+  151:         [FromBody] CreateBookingRequest request)
+  152:     {
+  153:         var userId = GetAuthenticatedUserId();
+  154: 
+  155:         if (!userId.HasValue)
+  156:         {
+  157:             return Unauthorized();
+  158:         }
+  159: 
+  160:         var canReadAll = await HasPermissionAsync(
+  161:             userId.Value,
+  162:             "bookings.read_all");
+  163: 
+  164:         Customer? customer = null;
+  165: 
+  166:         if (canReadAll)
+  167:         {
+  168:             if (!request.CustomerId.HasValue ||
+  169:                 request.CustomerId.Value <= 0)
+  170:             {
+  171:                 return BadRequest(new
+  172:                 {
+  173:                     message = "A valid customer must be selected."
+  174:                 });
+  175:             }
+  176: 
+  177:             customer = await _db.Customers
+  178:                 .FirstOrDefaultAsync(x =>
+  179:                     x.Id == request.CustomerId.Value &&
+  180:                     x.IsActive);
+  181:         }
+  182:         else
+  183:         {
+  184:             // Never trust a customer ID submitted by an external customer.
+  185:             // Resolve the customer's own profile from the authenticated user.
+  186:             customer = await _db.Customers
+  187:                 .FirstOrDefaultAsync(x =>
+  188:                     x.UserId == userId.Value &&
+  189:                     x.IsActive);
+  190:         }
+  191: 
+  192:         if (customer == null)
+  193:         {
+  194:             return BadRequest(new
+  195:             {
+  196:                 message = canReadAll
+  197:                     ? "Select an active customer before creating a booking."
+  198:                     : "Your account does not have an active customer profile. Contact Qubriq support."
+  199:             });
+  200:         }
+  201: 
+  202:         if (request.PickupDateUtc == default)
+  203:         {
+  204:             return BadRequest(new
+  205:             {
+  206:                 message = "A valid pickup date is required."
+  207:             });
+  208:         }
+  209: 
+  210:         if (request.ExpectedDeliveryUtc.HasValue &&
+  211:             request.ExpectedDeliveryUtc.Value < request.PickupDateUtc)
+  212:         {
+  213:             return BadRequest(new
+  214:             {
+  215:                 message = "Expected delivery cannot be earlier than pickup."
+  216:             });
+  217:         }
+  218: 
+  219:         var trackingNumber =
+  220:             $"QBR-{DateTime.UtcNow:yyyyMMdd}-" +
+  221:             Guid.NewGuid().ToString("N")[..8].ToUpperInvariant();
+  222: 
+  223:         var shipment = new Shipment
+  224:         {
+  225:             TrackingNumber = trackingNumber,
+  226:             CustomerId = customer.Id,
+  227:             Origin = request.Origin.Trim(),
+  228:             Destination = request.Destination.Trim(),
+  229:             Status = request.Status,
+  230:             CreatedAtUtc = DateTime.UtcNow,
+  231:             ExpectedDeliveryUtc = request.ExpectedDeliveryUtc,
+  232: 
+  233:             CargoName = request.CargoName.Trim(),
+  234:             CargoCategory = request.CargoCategory?.Trim(),
+  235:             PackageCount = request.PackageCount,
+  236:             TotalWeightKg = request.TotalWeightKg,
+  237:             LengthCm = request.LengthCm,
+  238:             WidthCm = request.WidthCm,
+  239:             HeightCm = request.HeightCm,
+  240:             IsFragile = request.IsFragile,
+  241:             SpecialHandlingRequirements =
+  242:                 request.SpecialHandlingRequirements?.Trim(),
+  243: 
+  244:             Priority = request.Priority,
+  245:             PickupDateUtc = request.PickupDateUtc,
+  246:             DeliveryTimeWindow = request.DeliveryTimeWindow?.Trim(),
+  247:             AdditionalInstructions =
+  248:                 request.AdditionalInstructions?.Trim()
+  249:         };
+  250: 
+  251:         _db.Shipments.Add(shipment);
+  252: 
+  253:         await _db.SaveChangesAsync();
+  254: 
+  255:         return CreatedAtAction(
+  256:             nameof(GetBookings),
+  257:             new { },
+  258:             new
+  259:             {
+  260:                 shipment.Id,
+  261:                 shipment.TrackingNumber,
+  262:                 shipment.Status,
+  263:                 message = "Booking created successfully."
+  264:             });
+  265:     }
+  266: }
+
+
+==========================================================================================
+FILE: backend\Qubriq.API\Models\Shipment.cs
+==========================================================================================
+    1: namespace Qubriq.API.Models;
+    2: 
+    3: public class Shipment
+    4: {
+    5:     public long Id { get; set; }
+    6: 
+    7:     public string TrackingNumber { get; set; } = string.Empty;
+    8: 
+    9:     public long CustomerId { get; set; }
+   10: 
+   11:     public string Origin { get; set; } = string.Empty;
+   12: 
+   13:     public string Destination { get; set; } = string.Empty;
+   14: 
+   15:     public string Status { get; set; } = "Draft";
+   16: 
+   17:     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+   18: 
+   19:     public DateTime? ExpectedDeliveryUtc { get; set; }
+   20: 
+   21:     // Cargo details
+   22:     public string? CargoName { get; set; }
+   23: 
+   24:     public string? CargoCategory { get; set; }
+   25: 
+   26:     public int? PackageCount { get; set; }
+   27: 
+   28:     public decimal? TotalWeightKg { get; set; }
+   29: 
+   30:     public decimal? LengthCm { get; set; }
+   31: 
+   32:     public decimal? WidthCm { get; set; }
+   33: 
+   34:     public decimal? HeightCm { get; set; }
+   35: 
+   36:     public bool? IsFragile { get; set; }
+   37: 
+   38:     public string? SpecialHandlingRequirements { get; set; }
+   39: 
+   40:     // Transport details
+   41:     public string? Priority { get; set; }
+   42: 
+   43:     public DateTime? PickupDateUtc { get; set; }
+   44: 
+   45:     public string? DeliveryTimeWindow { get; set; }
+   46: 
+   47:     public string? AdditionalInstructions { get; set; }
+   48: 
+   49:     public Customer Customer { get; set; } = null!;
+   50: 
+   51:     public ICollection<ShipmentAssignment> Assignments { get; set; }
+   52:         = new List<ShipmentAssignment>();
+   53: }
+
+
+==========================================================================================
+FILE: backend\Qubriq.API\Models\Vehicle.cs
+==========================================================================================
+    1: namespace Qubriq.API.Models;
+    2: 
+    3: public class Vehicle
+    4: {
+    5:     public long Id { get; set; }
+    6:     public string RegistrationNumber { get; set; } = string.Empty;
+    7:     public string VehicleType { get; set; } = string.Empty;
+    8:     public decimal CapacityKg { get; set; }
+    9:     public string Status { get; set; } = "Available";
+   10: 
+   11:     public ICollection<ShipmentAssignment> Assignments { get; set; } = new List<ShipmentAssignment>();
+   12: }
+
+
+==========================================================================================
+FILE: backend\Qubriq.API\Models\ShipmentAssignment.cs
+==========================================================================================
+    1: namespace Qubriq.API.Models;
+    2: 
+    3: public class ShipmentAssignment
+    4: {
+    5:     public long Id { get; set; }
+    6:     public long ShipmentId { get; set; }
+    7:     public long VehicleId { get; set; }
+    8:     public long DriverId { get; set; }
+    9:     public DateTime AssignedAtUtc { get; set; } = DateTime.UtcNow;
+   10:     public DateTime? ReleasedAtUtc { get; set; }
+   11:     public string Status { get; set; } = "Active";
+   12: 
+   13:     public Shipment Shipment { get; set; } = null!;
+   14:     public Vehicle Vehicle { get; set; } = null!;
+   15:     public Driver Driver { get; set; } = null!;
+   16: }
+
+
+==========================================================================================
+FILE: backend\Qubriq.API\Controllers\FleetController.cs
+==========================================================================================
+    1: using System.Data;
+    2: using System.Security.Claims;
+    3: using Microsoft.AspNetCore.Authorization;
+    4: using Microsoft.AspNetCore.Mvc;
+    5: using Microsoft.EntityFrameworkCore;
+    6: using Qubriq.API.Data;
+    7: using Qubriq.API.Models;
+    8: 
+    9: namespace Qubriq.API.Controllers;
+   10: 
+   11: [ApiController]
+   12: [Route("api/fleet")]
+   13: [Authorize(Roles = "Admin,OperationsDispatcher")]
+   14: public class FleetController : ControllerBase
+   15: {
+   16:     private readonly QubriqDbContext _db;
+   17: 
+   18:     public FleetController(QubriqDbContext db)
+   19:     {
+   20:         _db = db;
+   21:     }
+   22: 
+   23:     private long? UserId()
+   24:     {
+   25:         var value = User.FindFirst("sub")?.Value
+   26:             ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+   27:         return long.TryParse(value, out var id) ? id : null;
+   28:     }
+   29: 
+   30:     private async Task<bool> Allowed(string permission)
+   31:     {
+   32:         var id = UserId();
+   33:         if (!id.HasValue) return false;
+   34: 
+   35:         if (!await _db.Users.AnyAsync(x => x.Id == id.Value && x.IsActive))
+   36:             return false;
+   37: 
+   38:         return await _db.UserRoles
+   39:             .Where(x => x.UserId == id.Value)
+   40:             .Join(_db.RolePermissions,
+   41:                 ur => ur.RoleId,
+   42:                 rp => rp.RoleId,
+   43:                 (_, rp) => rp)
+   44:             .AnyAsync(x => x.IsAllowed && x.Permission.Code == permission);
+   45:     }
+   46: 
+   47:     // VEHICLES
+   48: 
+   49:     [HttpGet("vehicles")]
+   50:     public async Task<IActionResult> GetVehicles()
+   51:     {
+   52:         if (!await Allowed("fleet.vehicles.manage")) return Forbid();
+   53: 
+   54:         var items = await _db.Vehicles
+   55:             .AsNoTracking()
+   56:             .OrderBy(x => x.RegistrationNumber)
+   57:             .Select(x => new
+   58:             {
+   59:                 x.Id,
+   60:                 x.RegistrationNumber,
+   61:                 x.VehicleType,
+   62:                 x.CapacityKg,
+   63:                 x.Status
+   64:             }).ToListAsync();
+   65: 
+   66:         return Ok(items);
+   67:     }
+   68: 
+   69:     [HttpPost("vehicles")]
+   70:     public async Task<IActionResult> CreateVehicle(VehicleRequest request)
+   71:     {
+   72:         if (!await Allowed("fleet.vehicles.manage")) return Forbid();
+   73: 
+   74:         if (string.IsNullOrWhiteSpace(request.RegistrationNumber) ||
+   75:             string.IsNullOrWhiteSpace(request.VehicleType) ||
+   76:             request.RegistrationNumber.Trim().Length > 30 ||
+   77:             request.VehicleType.Trim().Length > 80 ||
+   78:             request.CapacityKg <= 0)
+   79:             return BadRequest(new { message = "Enter a valid registration, vehicle type and positive capacity." });
+   80: 
+   81:         var registration = request.RegistrationNumber.Trim().ToUpperInvariant();
+   82: 
+   83:         if (await _db.Vehicles.AnyAsync(x => x.RegistrationNumber == registration))
+   84:             return Conflict(new { message = "Registration number already exists." });
+   85: 
+   86:         var vehicle = new Vehicle
+   87:         {
+   88:             RegistrationNumber = registration,
+   89:             VehicleType = request.VehicleType.Trim(),
+   90:             CapacityKg = request.CapacityKg,
+   91:             Status = "Available"
+   92:         };
+   93: 
+   94:         _db.Vehicles.Add(vehicle);
+   95:         await _db.SaveChangesAsync();
+   96: 
+   97:         return CreatedAtAction(nameof(GetVehicles), new { },
+   98:             new { vehicle.Id, vehicle.RegistrationNumber, vehicle.Status });
+   99:     }
+  100: 
+  101:     [HttpPatch("vehicles/{id:long}/status")]
+  102:     public async Task<IActionResult> UpdateVehicleStatus(long id, StatusRequest request)
+  103:     {
+  104:         if (!await Allowed("fleet.vehicles.manage")) return Forbid();
+  105: 
+  106:         if (request.Status is not ("Available" or "Maintenance" or "Inactive"))
+  107:             return BadRequest(new { message = "Status must be Available, Maintenance or Inactive." });
+  108: 
+  109:         var vehicle = await _db.Vehicles.FirstOrDefaultAsync(x => x.Id == id);
+  110:         if (vehicle == null) return NotFound();
+  111: 
+  112:         var active = await _db.ShipmentAssignments.AnyAsync(
+  113:             x => x.VehicleId == id && x.Status == "Active");
+  114: 
+  115:         if (active && request.Status != "Available")
+  116:             return Conflict(new { message = "Release the active assignment before changing vehicle status." });
+  117: 
+  118:         vehicle.Status = request.Status;
+  119:         await _db.SaveChangesAsync();
+  120:         return Ok(new { vehicle.Id, vehicle.Status });
+  121:     }
+  122: 
+  123:     // DRIVERS
+  124: 
+  125:     [HttpGet("drivers")]
+  126:     public async Task<IActionResult> GetDrivers()
+  127:     {
+  128:         if (!await Allowed("fleet.drivers.manage")) return Forbid();
+  129: 
+  130:         var items = await _db.Drivers
+  131:             .AsNoTracking()
+  132:             .OrderBy(x => x.FullName)
+  133:             .Select(x => new
+  134:             {
+  135:                 x.Id,
+  136:                 x.FullName,
+  137:                 x.Phone,
+  138:                 x.LicenseNumber,
+  139:                 x.Status,
+  140:                 x.UserId
+  141:             }).ToListAsync();
+  142: 
+  143:         return Ok(items);
+  144:     }
+  145: 
+  146:     [HttpPost("drivers")]
+  147:     public async Task<IActionResult> CreateDriver(DriverRequest request)
+  148:     {
+  149:         if (!await Allowed("fleet.drivers.manage")) return Forbid();
+  150: 
+  151:         if (string.IsNullOrWhiteSpace(request.FullName) ||
+  152:             string.IsNullOrWhiteSpace(request.LicenseNumber) ||
+  153:             request.FullName.Trim().Length > 150 ||
+  154:             request.LicenseNumber.Trim().Length > 60 ||
+  155:             (request.Phone?.Length ?? 0) > 30)
+  156:             return BadRequest(new { message = "Enter valid driver name, license number and phone." });
+  157: 
+  158:         var license = request.LicenseNumber.Trim().ToUpperInvariant();
+  159: 
+  160:         if (await _db.Drivers.AnyAsync(x => x.LicenseNumber == license))
+  161:             return Conflict(new { message = "License number already exists." });
+  162: 
+  163:         var driver = new Driver
+  164:         {
+  165:             FullName = request.FullName.Trim(),
+  166:             Phone = request.Phone?.Trim(),
+  167:             LicenseNumber = license,
+  168:             Status = "Available"
+  169:         };
+  170: 
+  171:         _db.Drivers.Add(driver);
+  172:         await _db.SaveChangesAsync();
+  173: 
+  174:         return CreatedAtAction(nameof(GetDrivers), new { },
+  175:             new { driver.Id, driver.FullName, driver.Status });
+  176:     }
+  177: 
+  178:     [HttpPatch("drivers/{id:long}/status")]
+  179:     public async Task<IActionResult> UpdateDriverStatus(long id, StatusRequest request)
+  180:     {
+  181:         if (!await Allowed("fleet.drivers.manage")) return Forbid();
+  182: 
+  183:         if (request.Status is not ("Available" or "OnLeave" or "Inactive"))
+  184:             return BadRequest(new { message = "Status must be Available, OnLeave or Inactive." });
+  185: 
+  186:         var driver = await _db.Drivers.FirstOrDefaultAsync(x => x.Id == id);
+  187:         if (driver == null) return NotFound();
+  188: 
+  189:         var active = await _db.ShipmentAssignments.AnyAsync(
+  190:             x => x.DriverId == id && x.Status == "Active");
+  191: 
+  192:         if (active && request.Status != "Available")
+  193:             return Conflict(new { message = "Release the active assignment before changing driver status." });
+  194: 
+  195:         driver.Status = request.Status;
+  196:         await _db.SaveChangesAsync();
+  197:         return Ok(new { driver.Id, driver.Status });
+  198:     }
+  199: 
+  200:     // ASSIGNMENTS
+  201: 
+  202:     [HttpGet("assignments")]
+  203:     public async Task<IActionResult> GetAssignments()
+  204:     {
+  205:         if (!await Allowed("fleet.assignments.manage")) return Forbid();
+  206: 
+  207:         var items = await _db.ShipmentAssignments
+  208:             .AsNoTracking()
+  209:             .Include(x => x.Shipment)
+  210:             .Include(x => x.Driver)
+  211:             .Include(x => x.Vehicle)
+  212:             .OrderByDescending(x => x.AssignedAtUtc)
+  213:             .Select(x => new
+  214:             {
+  215:                 x.Id,
+  216:                 x.ShipmentId,
+  217:                 trackingNumber = x.Shipment.TrackingNumber,
+  218:                 driver = x.Driver.FullName,
+  219:                 vehicle = x.Vehicle.RegistrationNumber,
+  220:                 x.AssignedAtUtc,
+  221:                 x.ReleasedAtUtc,
+  222:                 x.Status
+  223:             }).ToListAsync();
+  224: 
+  225:         return Ok(items);
+  226:     }
+  227: 
+  228:     [HttpPost("assignments")]
+  229:     public async Task<IActionResult> Assign(AssignmentRequest request)
+  230:     {
+  231:         if (!await Allowed("fleet.assignments.manage")) return Forbid();
+  232: 
+  233:         if (request.ShipmentId <= 0 || request.DriverId <= 0 || request.VehicleId <= 0)
+  234:             return BadRequest(new { message = "Select a shipment, driver and vehicle." });
+  235: 
+  236:         await using var tx = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+  237: 
+  238:         var shipment = await _db.Shipments
+  239:             .FirstOrDefaultAsync(x => x.Id == request.ShipmentId);
+  240: 
+  241:         if (shipment == null) return NotFound(new { message = "Shipment not found." });
+  242: 
+  243:         if (shipment.Status != "Confirmed")
+  244:             return Conflict(new { message = "Only Confirmed bookings can be assigned." });
+  245: 
+  246:         var driver = await _db.Drivers.FirstOrDefaultAsync(x => x.Id == request.DriverId);
+  247:         var vehicle = await _db.Vehicles.FirstOrDefaultAsync(x => x.Id == request.VehicleId);
+  248: 
+  249:         if (driver == null || vehicle == null)
+  250:             return BadRequest(new { message = "Driver or vehicle not found." });
+  251: 
+  252:         if (driver.Status != "Available" || vehicle.Status != "Available")
+  253:             return Conflict(new { message = "Driver and vehicle must both be Available." });
+  254: 
+  255:         if (shipment.TotalWeightKg.HasValue &&
+  256:             shipment.TotalWeightKg.Value > vehicle.CapacityKg)
+  257:             return Conflict(new { message = "Shipment weight exceeds vehicle capacity." });
+  258: 
+  259:         var shipmentAssigned = await _db.ShipmentAssignments.AnyAsync(
+  260:             x => x.ShipmentId == request.ShipmentId && x.Status == "Active");
+  261: 
+  262:         var driverAssigned = await _db.ShipmentAssignments.AnyAsync(
+  263:             x => x.DriverId == request.DriverId && x.Status == "Active");
+  264: 
+  265:         var vehicleAssigned = await _db.ShipmentAssignments.AnyAsync(
+  266:             x => x.VehicleId == request.VehicleId && x.Status == "Active");
+  267: 
+  268:         if (shipmentAssigned || driverAssigned || vehicleAssigned)
+  269:             return Conflict(new { message = "Shipment, driver or vehicle already has an active assignment." });
+  270: 
+  271:         var assignment = new ShipmentAssignment
+  272:         {
+  273:             ShipmentId = shipment.Id,
+  274:             DriverId = driver.Id,
+  275:             VehicleId = vehicle.Id,
+  276:             AssignedAtUtc = DateTime.UtcNow,
+  277:             Status = "Active"
+  278:         };
+  279: 
+  280:         _db.ShipmentAssignments.Add(assignment);
+  281:         shipment.Status = "Assigned";
+  282: 
+  283:         _db.AuditLogs.Add(new AuditLog
+  284:         {
+  285:             UserId = UserId(),
+  286:             Action = "SHIPMENT_DRIVER_ASSIGNED",
+  287:             EntityType = "Shipment",
+  288:             EntityId = shipment.Id.ToString(),
+  289:             Details = $"DriverId={driver.Id}; VehicleId={vehicle.Id}",
+  290:             CreatedAtUtc = DateTime.UtcNow
+  291:         });
+  292: 
+  293:         await _db.SaveChangesAsync();
+  294:         await tx.CommitAsync();
+  295: 
+  296:         return Ok(new
+  297:         {
+  298:             assignment.Id,
+  299:             assignment.ShipmentId,
+  300:             assignment.DriverId,
+  301:             assignment.VehicleId,
+  302:             shipment.Status
+  303:         });
+  304:     }
+  305: }
+  306: 
+  307: public sealed class VehicleRequest
+  308: {
+  309:     public string RegistrationNumber { get; set; } = "";
+  310:     public string VehicleType { get; set; } = "";
+  311:     public decimal CapacityKg { get; set; }
+  312: }
+  313: 
+  314: public sealed class DriverRequest
+  315: {
+  316:     public string FullName { get; set; } = "";
+  317:     public string? Phone { get; set; }
+  318:     public string LicenseNumber { get; set; } = "";
+  319: }
+  320: 
+  321: public sealed class AssignmentRequest
+  322: {
+  323:     public long ShipmentId { get; set; }
+  324:     public long DriverId { get; set; }
+  325:     public long VehicleId { get; set; }
+  326: }
+  327: 
+  328: public sealed class StatusRequest
+  329: {
+  330:     public string Status { get; set; } = "";
+  331: }
+
+
+==========================================================================================
+FILE: backend\Qubriq.API\Controllers\AdminShipmentAssignmentsController.cs
+==========================================================================================
+    1: using System.Data;
+    2: using System.Security.Claims;
+    3: using Microsoft.AspNetCore.Authorization;
+    4: using Microsoft.AspNetCore.Mvc;
+    5: using Microsoft.EntityFrameworkCore;
+    6: using Qubriq.API.Data;
+    7: using Qubriq.API.Models;
+    8: 
+    9: namespace Qubriq.API.Controllers;
+   10: 
+   11: [ApiController]
+   12: [Route("api/admin/shipment-assignments")]
+   13: [Authorize(Roles = "Admin,OperationsDispatcher")]
+   14: public class AdminShipmentAssignmentsController : ControllerBase
+   15: {
+   16:     private readonly QubriqDbContext _db;
+   17: 
+   18:     public AdminShipmentAssignmentsController(QubriqDbContext db)
+   19:     {
+   20:         _db = db;
+   21:     }
+   22: 
+   23:     private long? AdminId()
+   24:     {
+   25:         var value = User.FindFirst("sub")?.Value ??
+   26:                     User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+   27: 
+   28:         return long.TryParse(value, out var id) ? id : null;
+   29:     }
+   30: 
+   31:     private async Task<bool> HasPermission(string code)
+   32:     {
+   33:         var id = AdminId();
+   34:         if (!id.HasValue) return false;
+   35: 
+   36:         return await _db.UserRoles
+   37:             .Where(x => x.UserId == id.Value)
+   38:             .Join(_db.RolePermissions,
+   39:                 x => x.RoleId,
+   40:                 x => x.RoleId,
+   41:                 (_, p) => p)
+   42:             .AnyAsync(x => x.IsAllowed && x.Permission.Code == code);
+   43:     }
+   44: 
+   45:     public sealed class DriverAssignmentRequest
+   46:     {
+   47:         public long ShipmentId { get; set; }
+   48:         public long DriverId { get; set; }
+   49:         public long VehicleId { get; set; }
+   50:     }
+   51: 
+   52:     [HttpPost("driver")]
+   53:     public async Task<IActionResult> AssignDriver(
+   54:         [FromBody] DriverAssignmentRequest request)
+   55:     {
+   56:         if (!await HasPermission("delivery.assignments.manage"))
+   57:             return Forbid();
+   58: 
+   59:         await using var transaction =
+   60:             await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+   61: 
+   62:         var shipment = await _db.Shipments
+   63:             .FirstOrDefaultAsync(x => x.Id == request.ShipmentId);
+   64: 
+   65:         if (shipment == null)
+   66:             return NotFound(new { message = "Shipment not found." });
+   67: 
+   68:         var driver = await _db.Drivers
+   69:             .FirstOrDefaultAsync(x => x.Id == request.DriverId);
+   70: 
+   71:         var vehicle = await _db.Vehicles
+   72:             .FirstOrDefaultAsync(x => x.Id == request.VehicleId);
+   73: 
+   74:         if (driver == null || vehicle == null)
+   75:             return BadRequest(new { message = "Valid driver and vehicle are required." });
+   76: 
+   77:         if (driver.Status != "Available" || vehicle.Status != "Available")
+   78:             return Conflict(new { message = "Driver and vehicle must be Available." });
+   79: 
+   80:         var shipmentAlreadyAssigned = await _db.ShipmentAssignments.AnyAsync(x =>
+   81:             x.ShipmentId == request.ShipmentId &&
+   82:             x.Status == "Active" &&
+   83:             x.ReleasedAtUtc == null);
+   84: 
+   85:         if (shipmentAlreadyAssigned)
+   86:             return Conflict(new { message = "Shipment already has an active assignment." });
+   87: 
+   88:         var driverAlreadyAssigned = await _db.ShipmentAssignments.AnyAsync(x =>
+   89:             x.DriverId == request.DriverId &&
+   90:             x.Status == "Active" &&
+   91:             x.ReleasedAtUtc == null);
+   92: 
+   93:         if (driverAlreadyAssigned)
+   94:             return Conflict(new { message = "Driver already has an active assignment." });
+   95: 
+   96:         var vehicleAlreadyAssigned = await _db.ShipmentAssignments.AnyAsync(x =>
+   97:             x.VehicleId == request.VehicleId &&
+   98:             x.Status == "Active" &&
+   99:             x.ReleasedAtUtc == null);
+  100: 
+  101:         if (vehicleAlreadyAssigned)
+  102:             return Conflict(new { message = "Vehicle already has an active assignment." });
+  103: 
+  104:         var assignment = new ShipmentAssignment
+  105:         {
+  106:             ShipmentId = shipment.Id,
+  107:             DriverId = driver.Id,
+  108:             VehicleId = vehicle.Id,
+  109:             AssignedAtUtc = DateTime.UtcNow,
+  110:             Status = "Active"
+  111:         };
+  112: 
+  113:         _db.ShipmentAssignments.Add(assignment);
+  114: 
+  115:         shipment.Status = "Assigned";
+  116: 
+  117:         _db.AuditLogs.Add(new AuditLog
+  118:         {
+  119:             UserId = AdminId(),
+  120:             Action = "SHIPMENT_DRIVER_ASSIGNED",
+  121:             EntityType = "Shipment",
+  122:             EntityId = shipment.Id.ToString(),
+  123:             Details = $"AssignmentId={assignment.Id}; DriverId={driver.Id}; VehicleId={vehicle.Id}",
+  124:             CreatedAtUtc = DateTime.UtcNow
+  125:         });
+  126: 
+  127:         await _db.SaveChangesAsync();
+  128:         await transaction.CommitAsync();
+  129: 
+  130:         return Ok(new
+  131:         {
+  132:             assignment.Id,
+  133:             assignment.ShipmentId,
+  134:             assignment.DriverId,
+  135:             assignment.VehicleId,
+  136:             shipment.Status
+  137:         });
+  138:     }
+  139: 
+  140:     public sealed class FinalRecipientRequest
+  141:     {
+  142:         public long ShipmentId { get; set; }
+  143:         public long RecipientUserId { get; set; }
+  144:     }
+  145: 
+  146:     [HttpPost("recipient")]
+  147:     public async Task<IActionResult> AssignFinalRecipient(
+  148:         [FromBody] FinalRecipientRequest request)
+  149:     {
+  150:         if (!await HasPermission("delivery.assignments.manage"))
+  151:             return Forbid();
+  152: 
+  153:         await using var transaction =
+  154:             await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+  155: 
+  156:         var user = await _db.Users
+  157:             .FirstOrDefaultAsync(x =>
+  158:                 x.Id == request.RecipientUserId &&
+  159:                 x.IsActive &&
+  160:                 x.RecipientType == "FinalRecipient");
+  161: 
+  162:         if (user == null)
+  163:             return BadRequest(new { message = "Active FinalRecipient account not found." });
+  164: 
+  165:         var shipmentExists = await _db.Shipments
+  166:             .AnyAsync(x => x.Id == request.ShipmentId);
+  167: 
+  168:         if (!shipmentExists)
+  169:             return NotFound(new { message = "Shipment not found." });
+  170: 
+  171:         if (await _db.ShipmentRecipients.AnyAsync(x =>
+  172:             x.ShipmentId == request.ShipmentId &&
+  173:             x.UserId == request.RecipientUserId))
+  174:             return Conflict(new { message = "Recipient is already linked to this shipment." });
+  175: 
+  176:         _db.ShipmentRecipients.Add(new ShipmentRecipient
+  177:         {
+  178:             ShipmentId = request.ShipmentId,
+  179:             UserId = request.RecipientUserId,
+  180:             CreatedAtUtc = DateTime.UtcNow
+  181:         });
+  182: 
+  183:         _db.AuditLogs.Add(new AuditLog
+  184:         {
+  185:             UserId = AdminId(),
+  186:             Action = "FINAL_RECIPIENT_ASSIGNED",
+  187:             EntityType = "Shipment",
+  188:             EntityId = request.ShipmentId.ToString(),
+  189:             Details = $"RecipientUserId={request.RecipientUserId}",
+  190:             CreatedAtUtc = DateTime.UtcNow
+  191:         });
+  192: 
+  193:         await _db.SaveChangesAsync();
+  194:         await transaction.CommitAsync();
+  195: 
+  196:         return Ok(new { message = "Final recipient linked to shipment." });
+  197:     }
+  198: }
+
+
+==========================================================================================
+FILE: backend\Qubriq.API\DTOs\LoadOptimization\LoadOptimizationRequest.cs
+==========================================================================================
+    1: using System.ComponentModel.DataAnnotations;
+    2: 
