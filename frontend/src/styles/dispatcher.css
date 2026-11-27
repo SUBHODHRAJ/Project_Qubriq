@@ -282,3 +282,325 @@
 .delivery-operations-link:hover {
     text-decoration: underline;
 }
+/* =========================================
+   Command Center Enhancements
+   ========================================= */
+
+.cc-title-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.cc-live-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    color: #065f46;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.cc-live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+
+.cc-refresh-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.cc-alert-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+/* Action-priority triage bar */
+.cc-triage-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px 16px;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-left: 4px solid #f59e0b;
+    border-radius: 7px;
+    font-size: 12px;
+    color: #78350f;
+}
+
+.cc-triage-items {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.cc-triage-badge {
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: #f59e0b;
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.cc-triage-link {
+    color: #b45309;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.cc-triage-link:hover {
+    text-decoration: underline;
+}
+
+/* Interactive KPI cards */
+.cc-kpi-card {
+    text-decoration: none;
+    color: var(--qb-text, #17243a);
+    border-top: 3px solid var(--qb-border, #e3e8f0);
+    transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease;
+}
+
+.cc-kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(13, 35, 64, 0.06);
+}
+
+.cc-tone-info {
+    border-top-color: var(--qb-blue, #2864dc);
+}
+
+.cc-tone-success {
+    border-top-color: #10b981;
+}
+
+.cc-tone-warning {
+    border-top-color: #f59e0b;
+}
+
+.cc-tone-danger {
+    border-top-color: #ef4444;
+}
+
+.cc-kpi-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.cc-kpi-label {
+    color: var(--qb-muted, #78869a);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.cc-kpi-chip {
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.cc-chip-neutral {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.cc-chip-info {
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+.cc-chip-success {
+    background: #ecfdf5;
+    color: #047857;
+}
+
+.cc-chip-warning {
+    background: #fffbeb;
+    color: #b45309;
+}
+
+.cc-chip-danger {
+    background: #fef2f2;
+    color: #b91c1c;
+}
+
+.cc-kpi-value {
+    color: var(--qb-navy, #0d2340);
+    font-size: 28px;
+    font-weight: 800;
+    line-height: 1.1;
+}
+
+.cc-kpi-detail {
+    color: var(--qb-muted, #78869a);
+    font-size: 11px;
+}
+
+/* Panels & stacked distribution bars */
+.cc-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.cc-panel-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.cc-panel-header h2 {
+    margin: 0;
+    font-size: 14px;
+    color: var(--qb-navy, #0d2340);
+}
+
+.cc-panel-sub {
+    margin: 3px 0 0 !important;
+    font-size: 11px;
+    color: var(--qb-muted, #78869a);
+}
+
+.cc-panel-action {
+    margin-top: 0 !important;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--qb-blue, #2864dc);
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.cc-panel-action:hover {
+    text-decoration: underline;
+}
+
+.cc-stacked-bar {
+    height: 10px;
+    width: 100%;
+    display: flex;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #eef2f7;
+    gap: 2px;
+}
+
+.cc-bar-seg {
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.cc-seg-confirmed,
+.cc-seg-active {
+    background: var(--qb-blue, #2864dc);
+}
+
+.cc-seg-pending {
+    background: #f59e0b;
+}
+
+.cc-seg-rejected {
+    background: #ef4444;
+}
+
+.cc-seg-idle {
+    background: #10b981;
+}
+
+.cc-seg-driver {
+    background: var(--qb-navy, #0d2340);
+}
+
+.cc-stat-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.cc-stat-row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: #f8fafc;
+    border: 1px solid #edf2f7;
+    font-size: 12px;
+    color: #334155;
+}
+
+.cc-stat-row strong {
+    margin-left: auto;
+    font-size: 13px;
+    color: var(--qb-navy, #0d2340);
+}
+
+.cc-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* Skeleton loading cards */
+.cc-skeleton-card {
+    gap: 14px;
+}
+
+.cc-skeleton {
+    border-radius: 4px;
+    background: linear-gradient(90deg, #eef2f7 25%, #e2e8f0 50%, #eef2f7 75%);
+    background-size: 200% 100%;
+    animation: cc-shimmer 1.3s infinite linear;
+}
+
+.cc-skeleton-sm {
+    width: 55%;
+    height: 12px;
+}
+
+.cc-skeleton-lg {
+    width: 40%;
+    height: 28px;
+}
+
+.cc-skeleton-md {
+    width: 75%;
+    height: 11px;
+}
+
+@keyframes cc-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.cc-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 6px;
+    border-top: 1px solid var(--qb-border, #e3e8f0);
+}

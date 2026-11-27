@@ -8,6 +8,6 @@
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
-    <ProjectReference Include="S:\Project_Qubriq\backend\Qubriq.API\Qubriq.API.csproj" />
+    <ProjectReference Include="..\..\backend\Qubriq.API\Qubriq.API.csproj" />
   </ItemGroup>
 </Project>
