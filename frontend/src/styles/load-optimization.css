@@ -642,3 +642,134 @@
     .db-optimization-actions .load-run-button { width: 100%; min-width: 0; }
 }
 
+
+/* Loading plan approval workflow */
+.approval-panel {
+    border-color: rgba(56, 189, 248, 0.25);
+}
+
+.approval-status {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    border-radius: 20px;
+    padding: 7px 12px;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.approval-pending {
+    color: #fcd34d;
+    background: rgba(245, 158, 11, 0.1);
+}
+
+.approval-approved {
+    color: #86efac;
+    background: rgba(22, 163, 74, 0.1);
+}
+
+.approval-rejected {
+    color: #fca5a5;
+    background: rgba(220, 38, 38, 0.1);
+}
+
+.approval-review-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.approval-review-form label {
+    color: var(--text-secondary, #aab6c7);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.approval-review-form textarea {
+    width: 100%;
+    box-sizing: border-box;
+    resize: vertical;
+    min-height: 85px;
+    border: 1px solid var(--border-color, #34445a);
+    border-radius: 8px;
+    padding: 12px;
+    color: var(--text-primary, #e8edf5);
+    background: var(--input-bg, #0b1525);
+    font: inherit;
+    font-size: 13px;
+}
+
+.approval-actions {
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.approval-actions button {
+    border: 0;
+    border-radius: 8px;
+    padding: 11px 17px;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.approval-actions button:disabled {
+    opacity: 0.55;
+    cursor: wait;
+}
+
+.approval-approve-button {
+    color: #052e16;
+    background: #86efac;
+}
+
+.approval-reject-button {
+    color: #fff;
+    background: #b91c1c;
+}
+
+.approval-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.approval-history-list h3 {
+    margin: 0;
+    font-size: 13px;
+}
+
+.approval-history-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 13px;
+    border: 1px solid var(--border-color, rgba(148, 163, 184, 0.2));
+    border-radius: 9px;
+    background: rgba(148, 163, 184, 0.05);
+    font-size: 12px;
+}
+
+.approval-history-item span {
+    color: var(--text-secondary, #9aa8ba);
+}
+
+.approval-history-item p {
+    margin: 3px 0 0;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 600px) {
+    .approval-actions {
+        flex-direction: column-reverse;
+    }
+
+    .approval-actions button {
+        width: 100%;
+    }
+}

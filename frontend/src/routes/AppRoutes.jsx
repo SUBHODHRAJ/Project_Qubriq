@@ -21,6 +21,7 @@ import ShipmentDetailsPage from "../pages/ShipmentDetailsPage";
 import DeliveryOperationsPage from "../pages/DeliveryOperationsPage";
 import FleetPage from "../pages/FleetPage";
 import LoadOptimizationPage from "../pages/LoadOptimizationPage";
+import CargoManagementPage from "../pages/CargoManagementPage";
 import ModulePage from "../pages/ModulePage";
 import AdminSettingsPage from "../pages/AdminSettingsPage";
 
@@ -73,6 +74,7 @@ function AppRoutes() {
                     <Route path="shipments" element={<ShipmentsPage />} />
                     <Route path="deliveries" element={<DeliveryOperationsPage />} />
                     <Route path="load-optimization" element={<LoadOptimizationPage />} />
+                    <Route path="cargo" element={<CargoManagementPage />} />
                     <Route path="shipments/:id" element={<ShipmentDetailsPage />} />
 
                     <Route element={<ProtectedRoute allowedRoles={["Admin"]} />}>
@@ -109,6 +111,7 @@ function AppRoutes() {
 }
 
 export default AppRoutes;
+
 
 
 

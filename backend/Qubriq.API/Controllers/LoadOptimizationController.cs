@@ -387,6 +387,10 @@ public sealed class LoadOptimizationController : ControllerBase
                 algorithm = x.Algorithm,
                 status = x.Status,
                 isFeasible = x.IsFeasible,
+                approvalStatus = x.Approvals
+                    .OrderByDescending(a => a.ReviewedAtUtc)
+                    .Select(a => a.Decision)
+                    .FirstOrDefault() ?? "Pending",
                 totalPackages = x.TotalPackages,
                 placedPackages = x.PlacedPackages,
                 unplacedPackages = x.UnplacedPackages,
@@ -513,3 +517,4 @@ public sealed class LoadOptimizationController : ControllerBase
         });
     }
 }
+

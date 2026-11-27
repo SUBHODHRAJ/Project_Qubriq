@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { fleetService } from "../services/fleetService";
 import "../styles/dashboard.css";
 import "../styles/dispatcher.css";
@@ -27,6 +27,7 @@ function FleetPage() {
     const [tab, setTab] = useState("overview");
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [releasingAssignmentId, setReleasingAssignmentId] = useState(null);
     const [error, setError] = useState("");
     const [message, setMessage] = useState("");
     const [editingVehicleId, setEditingVehicleId] = useState(null);
@@ -133,6 +134,24 @@ function FleetPage() {
         finally { setSaving(false); }
     }
 
+    async function releaseAssignment(item) {
+        const confirmed = window.confirm(`Release assignment for shipment ${item.trackingNumber}? The shipment will return to Confirmed status.`);
+        if (!confirmed) return;
+
+        setReleasingAssignmentId(item.id);
+        setError("");
+        setMessage("");
+
+        try {
+            await fleetService.releaseAssignment(item.id);
+            setMessage(`Assignment for ${item.trackingNumber} released successfully.`);
+            await load();
+        } catch (err) {
+            setError(err.message || "Unable to release assignment.");
+        } finally {
+            setReleasingAssignmentId(null);
+        }
+    }
     async function changeStatus(type, item, status) {
         setError(""); setMessage("");
         try {
@@ -160,7 +179,7 @@ function FleetPage() {
                 </div>
                 <div className="fleet-header-actions">
                     <button className="button-secondary" type="button" onClick={load} disabled={loading}>
-                        <span aria-hidden="true">↻</span> Refresh
+                        <span aria-hidden="true">â†»</span> Refresh
                     </button>
                     <button className="button-primary" type="button" onClick={() => { setTab("vehicles"); setEditingVehicleId(null); setVehicleForm(EMPTY_VEHICLE); }}>
                         + Add vehicle
@@ -179,25 +198,25 @@ function FleetPage() {
             {error && <div className="dispatcher-error" role="alert">{error}</div>}
             {message && <div className="dispatcher-success" role="status">{message}</div>}
 
-            {loading ? <div className="fleet-loading">Loading fleet information…</div> : (
+            {loading ? <div className="fleet-loading">Loading fleet informationâ€¦</div> : (
                 <>
                     {tab === "overview" && (
                         <>
                             <div className="fleet-metric-grid">
                                 <article className="fleet-metric-card">
-                                    <span className="fleet-metric-icon">▣</span>
+                                    <span className="fleet-metric-icon">â–£</span>
                                     <div><small>Total vehicles</small><strong>{vehicles.length}</strong><p>Registered fleet</p></div>
                                 </article>
                                 <article className="fleet-metric-card">
-                                    <span className="fleet-metric-icon available">✓</span>
+                                    <span className="fleet-metric-icon available">âœ“</span>
                                     <div><small>Available vehicles</small><strong>{availableVehicles.length}</strong><p>Ready for allocation</p></div>
                                 </article>
                                 <article className="fleet-metric-card">
-                                    <span className="fleet-metric-icon">↗</span>
+                                    <span className="fleet-metric-icon">â†—</span>
                                     <div><small>Active assignments</small><strong>{activeAssignments.length}</strong><p>Currently allocated</p></div>
                                 </article>
                                 <article className="fleet-metric-card">
-                                    <span className="fleet-metric-icon">◫</span>
+                                    <span className="fleet-metric-icon">â—«</span>
                                     <div><small>Registered payload</small><strong>{formatNumber(totalPayload)} <em>kg</em></strong><p>Combined rated capacity</p></div>
                                 </article>
                             </div>
@@ -206,7 +225,7 @@ function FleetPage() {
                                 <section className="fleet-panel">
                                     <div className="fleet-panel-heading">
                                         <div><h2>Fleet availability</h2><p>Current status of registered vehicles</p></div>
-                                        <button className="fleet-text-button" onClick={() => setTab("vehicles")}>View vehicles →</button>
+                                        <button className="fleet-text-button" onClick={() => setTab("vehicles")}>View vehicles â†’</button>
                                     </div>
                                     <div className="fleet-status-list">
                                         {["Available", "OnTrip", "Maintenance", "Inactive"].map(status => {
@@ -227,26 +246,26 @@ function FleetPage() {
                                     </div>
                                     <div className="fleet-capacity-summary">
                                         <div><span>Payload capacity</span><strong>{formatNumber(totalPayload)} kg</strong></div>
-                                        <div><span>Estimated cargo volume</span><strong>{formatNumber(totalVolume)} m³</strong></div>
+                                        <div><span>Estimated cargo volume</span><strong>{formatNumber(totalVolume)} mÂ³</strong></div>
                                     </div>
                                     <div className="fleet-capacity-note">Capacity figures describe registered vehicle specifications. Actual available space depends on existing cargo and loading constraints.</div>
-                                    <button className="fleet-outline-action" onClick={() => setTab("assignments")}>Plan a shipment assignment <span>→</span></button>
+                                    <button className="fleet-outline-action" onClick={() => setTab("assignments")}>Plan a shipment assignment <span>â†’</span></button>
                                 </section>
                             </div>
 
                             <section className="fleet-panel">
                                 <div className="fleet-panel-heading">
                                     <div><h2>Vehicles at a glance</h2><p>Quick view of fleet readiness and carrying limits</p></div>
-                                    <button className="fleet-text-button" onClick={() => setTab("vehicles")}>Manage fleet →</button>
+                                    <button className="fleet-text-button" onClick={() => setTab("vehicles")}>Manage fleet â†’</button>
                                 </div>
                                 {vehicles.length ? (
                                     <div className="fleet-vehicle-grid">
                                         {vehicles.slice(0, 4).map(item => (
                                             <article className="fleet-vehicle-card" key={item.id}>
-                                                <div className="fleet-vehicle-card-top"><span className="fleet-vehicle-symbol">▰</span><span className={`fleet-status-pill ${statusClass(item.status)}`}>{item.status}</span></div>
+                                                <div className="fleet-vehicle-card-top"><span className="fleet-vehicle-symbol">â–°</span><span className={`fleet-status-pill ${statusClass(item.status)}`}>{item.status}</span></div>
                                                 <strong>{item.registrationNumber}</strong><span className="fleet-vehicle-type">{item.vehicleType}</span>
-                                                <div className="fleet-vehicle-specs"><span><b>{formatNumber(item.capacityKg)}</b> kg payload</span><span><b>{vehicleVolume(item) === null ? "—" : formatNumber(vehicleVolume(item))}</b> m³ cargo space</span></div>
-                                                <button className="fleet-text-button" onClick={() => editVehicle(item)}>Edit vehicle →</button>
+                                                <div className="fleet-vehicle-specs"><span><b>{formatNumber(item.capacityKg)}</b> kg payload</span><span><b>{vehicleVolume(item) === null ? "â€”" : formatNumber(vehicleVolume(item))}</b> mÂ³ cargo space</span></div>
+                                                <button className="fleet-text-button" onClick={() => editVehicle(item)}>Edit vehicle â†’</button>
                                             </article>
                                         ))}
                                     </div>
@@ -271,20 +290,20 @@ function FleetPage() {
                                         <label>Cargo width (cm)<input required type="number" min="0.01" step="0.01" placeholder="Width" value={vehicleForm.cargoWidthCm} onChange={e => setVehicleForm({ ...vehicleForm, cargoWidthCm: e.target.value })} /></label>
                                         <label>Cargo height (cm)<input required type="number" min="0.01" step="0.01" placeholder="Height" value={vehicleForm.cargoHeightCm} onChange={e => setVehicleForm({ ...vehicleForm, cargoHeightCm: e.target.value })} /></label>
                                     </div>
-                                    <div className="fleet-form-footer"><p>Internal cargo dimensions are used to estimate usable volume (m³).</p><button className="button-primary" disabled={saving}>{saving ? "Saving…" : editingVehicleId ? "Save changes" : "Add vehicle to fleet"}</button></div>
+                                    <div className="fleet-form-footer"><p>Internal cargo dimensions are used to estimate usable volume (mÂ³).</p><button className="button-primary" disabled={saving}>{saving ? "Savingâ€¦" : editingVehicleId ? "Save changes" : "Add vehicle to fleet"}</button></div>
                                 </form>
                             </section>
 
                             <section className="fleet-panel">
                                 <div className="fleet-panel-heading fleet-list-heading"><div><h2>Vehicle inventory</h2><p>{vehicles.length} registered vehicle{vehicles.length === 1 ? "" : "s"}</p></div>
-                                    <div className="fleet-filters"><input aria-label="Search vehicles" placeholder="Search registration or type…" value={vehicleSearch} onChange={e => setVehicleSearch(e.target.value)} /><select aria-label="Filter by status" value={vehicleStatus} onChange={e => setVehicleStatus(e.target.value)}><option>All</option><option>Available</option><option>OnTrip</option><option>Maintenance</option><option>Inactive</option></select></div>
+                                    <div className="fleet-filters"><input aria-label="Search vehicles" placeholder="Search registration or typeâ€¦" value={vehicleSearch} onChange={e => setVehicleSearch(e.target.value)} /><select aria-label="Filter by status" value={vehicleStatus} onChange={e => setVehicleStatus(e.target.value)}><option>All</option><option>Available</option><option>OnTrip</option><option>Maintenance</option><option>Inactive</option></select></div>
                                 </div>
                                 <div className="fleet-table-wrap"><table className="fleet-table"><thead><tr><th>Vehicle</th><th>Payload limit</th><th>Cargo dimensions</th><th>Volume</th><th>Status</th><th>Actions</th></tr></thead>
                                     <tbody>{filteredVehicles.map(item => <tr key={item.id}>
                                         <td><strong>{item.registrationNumber}</strong><small>{item.vehicleType}</small></td>
                                         <td>{formatNumber(item.capacityKg)} kg</td>
-                                        <td>{item.cargoLengthCm && item.cargoWidthCm && item.cargoHeightCm ? `${item.cargoLengthCm} × ${item.cargoWidthCm} × ${item.cargoHeightCm} cm` : "Not configured"}</td>
-                                        <td>{vehicleVolume(item) === null ? "—" : `${formatNumber(vehicleVolume(item))} m³`}</td>
+                                        <td>{item.cargoLengthCm && item.cargoWidthCm && item.cargoHeightCm ? `${item.cargoLengthCm} Ã— ${item.cargoWidthCm} Ã— ${item.cargoHeightCm} cm` : "Not configured"}</td>
+                                        <td>{vehicleVolume(item) === null ? "â€”" : `${formatNumber(vehicleVolume(item))} mÂ³`}</td>
                                         <td><span className={`fleet-status-pill ${statusClass(item.status)}`}>{item.status}</span></td>
                                         <td className="fleet-row-actions"><button type="button" onClick={() => editVehicle(item)}>Edit</button><select aria-label={`Change status for ${item.registrationNumber}`} value={item.status} onChange={e => changeStatus("vehicle", item, e.target.value)}><option>Available</option><option>Maintenance</option><option>Inactive</option></select></td>
                                     </tr>)}
@@ -304,13 +323,13 @@ function FleetPage() {
                                         <label>Phone number<input maxLength="30" placeholder="Contact number" value={driverForm.phone} onChange={e => setDriverForm({ ...driverForm, phone: e.target.value })} /></label>
                                         <label>Driving licence number<input required maxLength="60" placeholder="Licence number" value={driverForm.licenseNumber} onChange={e => setDriverForm({ ...driverForm, licenseNumber: e.target.value })} /></label>
                                     </div>
-                                    <div className="fleet-form-footer"><p>Only available drivers can be selected for a new assignment.</p><button className="button-primary" disabled={saving}>{saving ? "Saving…" : "Add driver"}</button></div>
+                                    <div className="fleet-form-footer"><p>Only available drivers can be selected for a new assignment.</p><button className="button-primary" disabled={saving}>{saving ? "Savingâ€¦" : "Add driver"}</button></div>
                                 </form>
                             </section>
                             <section className="fleet-panel"><div className="fleet-panel-heading"><div><h2>Driver directory</h2><p>{availableDrivers.length} available of {drivers.length} registered drivers</p></div></div>
                                 <div className="fleet-table-wrap"><table className="fleet-table"><thead><tr><th>Driver</th><th>Phone</th><th>Licence</th><th>Status</th><th>Update status</th></tr></thead><tbody>
-                                    {drivers.map(item => <tr key={item.id}><td><strong>{item.fullName}</strong></td><td>{item.phone || "—"}</td><td>{item.licenseNumber}</td><td><span className={`fleet-status-pill ${statusClass(item.status)}`}>{item.status}</span></td><td><select aria-label={`Change status for ${item.fullName}`} value={item.status} onChange={e => changeStatus("driver", item, e.target.value)}><option>Available</option><option>OnLeave</option><option>Inactive</option></select></td></tr>)}
-                                    {!drivers.length && <tr><td colSpan="5" className="fleet-empty-cell">No drivers registered.</td></tr>}
+                                    {drivers.map(item => <tr key={item.id}><td><strong>{item.fullName}</strong></td><td>{item.phone || "â€”"}</td><td>{item.licenseNumber}</td><td><span className={`fleet-status-pill ${statusClass(item.status)}`}>{item.status}</span></td><td><select aria-label={`Change status for ${item.fullName}`} value={item.status} onChange={e => changeStatus("driver", item, e.target.value)}><option>Available</option><option>OnLeave</option><option>Inactive</option></select></td></tr>)}
+                                    {!drivers.length && <tr><td colSpan="6" className="fleet-empty-cell">No drivers registered.</td></tr>}
                                 </tbody></table></div>
                             </section>
                         </>
@@ -322,18 +341,18 @@ function FleetPage() {
                                 <div className="fleet-panel-heading"><div><h2>Allocate a shipment</h2><p>Choose a confirmed shipment, an available driver and a vehicle that can carry its recorded payload.</p></div></div>
                                 <form onSubmit={submitAssignment} className="fleet-form">
                                     <div className="fleet-form-grid fleet-assignment-form-grid">
-                                        <label>Confirmed shipment<select required value={assignmentForm.shipmentId} onChange={e => setAssignmentForm({ ...assignmentForm, shipmentId: e.target.value })}><option value="">Select shipment</option>{shipments.map(item => <option key={item.id} value={item.id}>{item.trackingNumber} — {item.customer}</option>)}</select></label>
+                                        <label>Confirmed shipment<select required value={assignmentForm.shipmentId} onChange={e => setAssignmentForm({ ...assignmentForm, shipmentId: e.target.value })}><option value="">Select shipment</option>{shipments.map(item => <option key={item.id} value={item.id}>{item.trackingNumber} â€” {item.customer}</option>)}</select></label>
                                         <label>Available driver<select required value={assignmentForm.driverId} onChange={e => setAssignmentForm({ ...assignmentForm, driverId: e.target.value })}><option value="">Select driver</option>{availableDrivers.map(item => <option key={item.id} value={item.id}>{item.fullName}</option>)}</select></label>
-                                        <label>Available vehicle<select required value={assignmentForm.vehicleId} onChange={e => setAssignmentForm({ ...assignmentForm, vehicleId: e.target.value })}><option value="">Select vehicle</option>{eligibleVehicles.map(item => <option key={item.id} value={item.id}>{item.registrationNumber} · {item.vehicleType} · {formatNumber(item.capacityKg)} kg</option>)}</select></label>
+                                        <label>Available vehicle<select required value={assignmentForm.vehicleId} onChange={e => setAssignmentForm({ ...assignmentForm, vehicleId: e.target.value })}><option value="">Select vehicle</option>{eligibleVehicles.map(item => <option key={item.id} value={item.id}>{item.registrationNumber} Â· {item.vehicleType} Â· {formatNumber(item.capacityKg)} kg</option>)}</select></label>
                                     </div>
-                                    {selectedShipment && <div className="fleet-shipment-summary"><strong>Shipment requirements</strong><div><span>Tracking ID<b>{selectedShipment.trackingNumber}</b></span><span>Cargo weight<b>{selectedShipment.weightKg == null ? "Not recorded" : `${formatNumber(selectedShipment.weightKg)} kg`}</b></span><span>Package count<b>{selectedShipment.packageCount ?? "Not recorded"}</b></span><span>Dimensions<b>{selectedShipment.lengthCm && selectedShipment.widthCm && selectedShipment.heightCm ? `${selectedShipment.lengthCm} × ${selectedShipment.widthCm} × ${selectedShipment.heightCm} cm` : "Not recorded"}</b></span></div></div>}
-                                    <div className="fleet-form-footer"><p>Vehicle suitability should be confirmed against both payload and cargo dimensions before loading.</p><button className="button-primary" disabled={saving || !shipments.length || !availableDrivers.length || !eligibleVehicles.length}>{saving ? "Assigning…" : "Confirm assignment"}</button></div>
+                                    {selectedShipment && <div className="fleet-shipment-summary"><strong>Shipment requirements</strong><div><span>Tracking ID<b>{selectedShipment.trackingNumber}</b></span><span>Cargo weight<b>{selectedShipment.weightKg == null ? "Not recorded" : `${formatNumber(selectedShipment.weightKg)} kg`}</b></span><span>Package count<b>{selectedShipment.packageCount ?? "Not recorded"}</b></span><span>Dimensions<b>{selectedShipment.lengthCm && selectedShipment.widthCm && selectedShipment.heightCm ? `${selectedShipment.lengthCm} Ã— ${selectedShipment.widthCm} Ã— ${selectedShipment.heightCm} cm` : "Not recorded"}</b></span></div></div>}
+                                    <div className="fleet-form-footer"><p>Vehicle suitability should be confirmed against both payload and cargo dimensions before loading.</p><button className="button-primary" disabled={saving || !shipments.length || !availableDrivers.length || !eligibleVehicles.length}>{saving ? "Assigningâ€¦" : "Confirm assignment"}</button></div>
                                 </form>
                             </section>
                             <section className="fleet-panel"><div className="fleet-panel-heading"><div><h2>Assignment history</h2><p>{assignments.length} recorded assignment{assignments.length === 1 ? "" : "s"}</p></div></div>
-                                <div className="fleet-table-wrap"><table className="fleet-table"><thead><tr><th>Shipment</th><th>Driver</th><th>Vehicle</th><th>Assigned date</th><th>Status</th></tr></thead><tbody>
-                                    {assignments.map(item => <tr key={item.id}><td><strong>{item.trackingNumber}</strong></td><td>{item.driver}</td><td>{item.vehicle}</td><td>{item.assignedAtUtc ? new Date(item.assignedAtUtc).toLocaleString() : "—"}</td><td><span className={`fleet-status-pill ${statusClass(item.status)}`}>{item.status}</span></td></tr>)}
-                                    {!assignments.length && <tr><td colSpan="5" className="fleet-empty-cell">No shipment assignments recorded.</td></tr>}
+                                <div className="fleet-table-wrap"><table className="fleet-table"><thead><tr><th>Shipment</th><th>Driver</th><th>Vehicle</th><th>Assigned date</th><th>Status</th><th>Action</th></tr></thead><tbody>
+                                    {assignments.map(item => <tr key={item.id}><td><strong>{item.trackingNumber}</strong></td><td>{item.driver}</td><td>{item.vehicle}</td><td>{item.assignedAtUtc ? new Date(item.assignedAtUtc).toLocaleString() : "—"}</td><td><span className={`fleet-status-pill ${statusClass(item.status)}`}>{item.status}</span></td><td>{item.status === "Active" && !item.releasedAtUtc ? <button type="button" className="button-secondary" disabled={releasingAssignmentId === item.id} onClick={() => releaseAssignment(item)}>{releasingAssignmentId === item.id ? "Releasing..." : "Release"}</button> : <span>—</span>}</td></tr>)}
+                                    {!assignments.length && <tr><td colSpan="6" className="fleet-empty-cell">No shipment assignments recorded.</td></tr>}
                                 </tbody></table></div>
                             </section>
                         </>
@@ -345,3 +364,6 @@ function FleetPage() {
 }
 
 export default FleetPage;
+
+
+

@@ -30,6 +30,11 @@ const navigation = [
         icon: "▧"
     },
     {
+        label: "Cargo Management",
+        path: "/app/cargo",
+        icon: "▦"
+    },
+    {
         label: "Compliance",
         path: "/app/compliance",
         icon: "✓"
@@ -181,4 +186,9 @@ function DashboardLayout() {
 }
 
 export default DashboardLayout;
+
+
+
+
+
 

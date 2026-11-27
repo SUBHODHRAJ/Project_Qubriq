@@ -1,15 +1,13 @@
-import { apiRequest } from "./apiClient";
+﻿import { apiRequest } from "./apiClient";
 
 const BASE = "/api/load-optimization";
 
 export const loadOptimizationService = {
-    // Retained for backward compatibility with the original manual optimizer.
     optimize: request => apiRequest(`${BASE}/optimize`, {
         method: "POST",
         body: JSON.stringify(request)
     }),
 
-    // Fleet-integrated endpoints.
     getAssignedShipments: () => apiRequest(`${BASE}/assigned-shipments`),
 
     optimizeShipment: (shipmentId, vehicleId) =>
@@ -20,5 +18,17 @@ export const loadOptimizationService = {
     getShipmentRuns: shipmentId =>
         apiRequest(`${BASE}/shipments/${shipmentId}/runs`),
 
-    getRun: runId => apiRequest(`${BASE}/runs/${runId}`)
+    getRun: runId => apiRequest(`${BASE}/runs/${runId}`),
+
+    getPendingApprovals: () =>
+        apiRequest(`${BASE}/approvals/pending`),
+
+    getApprovalHistory: runId =>
+        apiRequest(`${BASE}/approvals/${runId}`),
+
+    reviewLoadingPlan: (runId, decision, comments) =>
+        apiRequest(`${BASE}/approvals/${runId}`, {
+            method: "POST",
+            body: JSON.stringify({ decision, comments })
+        })
 };

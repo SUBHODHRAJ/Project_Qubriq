@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { loadOptimizationService } from "../services/loadOptimizationService";
 import LoadScene3D from "../components/loadOptimization/LoadScene3D";
+import LoadingPlanApprovalPanel from "../components/loadOptimization/LoadingPlanApprovalPanel";
 import "../styles/load-optimization.css";
 
 const number = (value, digits = 1) => {
     const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed.toFixed(digits) : "—";
+    return Number.isFinite(parsed) ? parsed.toFixed(digits) : "â€”";
 };
 
 function Metric({ label, value, suffix = "" }) {
@@ -133,8 +134,8 @@ export default function LoadOptimizationPage() {
     }
 
     const dimensions = selected
-        ? `${selected.lengthCm ?? "—"} × ${selected.widthCm ?? "—"} × ${selected.heightCm ?? "—"} cm`
-        : "—";
+        ? `${selected.lengthCm ?? "â€”"} Ã— ${selected.widthCm ?? "â€”"} Ã— ${selected.heightCm ?? "â€”"} cm`
+        : "â€”";
     const vehicleReady = selected &&
         Number(selected.lengthCm) > 0 &&
         Number(selected.widthCm) > 0 &&
@@ -172,7 +173,7 @@ export default function LoadOptimizationPage() {
                         <option value="">{loading ? "Loading assignments..." : "Select an active assignment"}</option>
                         {assignments.map(x => (
                             <option key={`${x.shipmentId}:${x.vehicleId}`} value={`${x.shipmentId}:${x.vehicleId}`}>
-                                {x.trackingNumber} · {x.origin} → {x.destination} · {x.registrationNumber}
+                                {x.trackingNumber} Â· {x.origin} â†’ {x.destination} Â· {x.registrationNumber}
                             </option>
                         ))}
                     </select>
@@ -189,8 +190,8 @@ export default function LoadOptimizationPage() {
                     <>
                         <div className="db-vehicle-summary">
                             <div><span>Vehicle</span><strong>{selected.registrationNumber}</strong></div>
-                            <div><span>Type</span><strong>{selected.vehicleType || "—"}</strong></div>
-                            <div><span>Loading space (L × W × H)</span><strong>{dimensions}</strong></div>
+                            <div><span>Type</span><strong>{selected.vehicleType || "â€”"}</strong></div>
+                            <div><span>Loading space (L Ã— W Ã— H)</span><strong>{dimensions}</strong></div>
                             <div><span>Maximum payload</span><strong>{number(selected.capacityKg, 2)} kg</strong></div>
                         </div>
                         {!vehicleReady && (
@@ -207,21 +208,21 @@ export default function LoadOptimizationPage() {
                     <div className="load-section-card">
                         <div className="load-section-heading">
                             <div><span className="load-step">02</span><h2>Registered shipment packages</h2></div>
-                            <span className="load-unit-note">{selected.packages?.length || 0} groups · {totalUnits} units</span>
+                            <span className="load-unit-note">{selected.packages?.length || 0} groups Â· {totalUnits} units</span>
                         </div>
                         <p className="load-helper">
                             These are saved package records. Edit dimensions, quantity or fragile handling in the shipment details workflow.
                         </p>
                         <div className="load-table-wrap">
                             <table className="load-placement-table db-package-table">
-                                <thead><tr><th>Package</th><th>Category</th><th>Quantity</th><th>Dimensions (L × W × H)</th><th>Unit weight</th><th>Handling</th></tr></thead>
+                                <thead><tr><th>Package</th><th>Category</th><th>Quantity</th><th>Dimensions (L Ã— W Ã— H)</th><th>Unit weight</th><th>Handling</th></tr></thead>
                                 <tbody>
                                     {(selected.packages || []).map(p => (
                                         <tr key={p.id}>
                                             <td><strong>{p.packageCode || `PKG-${p.id}`}</strong><small>{p.description}</small></td>
-                                            <td>{p.category || "—"}</td>
+                                            <td>{p.category || "â€”"}</td>
                                             <td>{p.quantity}</td>
-                                            <td>{p.lengthCm} × {p.widthCm} × {p.heightCm} cm</td>
+                                            <td>{p.lengthCm} Ã— {p.widthCm} Ã— {p.heightCm} cm</td>
                                             <td>{p.weightKg} kg</td>
                                             <td>{p.isFragile ? "Fragile" : "Standard"}</td>
                                         </tr>
@@ -246,16 +247,16 @@ export default function LoadOptimizationPage() {
                         {runs.length ? (
                             <div className="load-table-wrap">
                                 <table className="load-placement-table">
-                                    <thead><tr><th>Run</th><th>Created</th><th>Status</th><th>Placed</th><th>Space</th><th>Payload</th><th /></tr></thead>
+                                    <thead><tr><th>Run</th><th>Created</th><th>Status</th><th>Placed</th><th>Space</th><th>Payload</th><th>Approval</th><th /></tr></thead>
                                     <tbody>
                                         {runs.map(r => (
                                             <tr key={r.id}>
                                                 <td>#{r.id}</td>
-                                                <td>{r.createdAtUtc ? new Date(r.createdAtUtc).toLocaleString() : "—"}</td>
+                                                <td>{r.createdAtUtc ? new Date(r.createdAtUtc).toLocaleString() : "â€”"}</td>
                                                 <td>{r.status}</td>
                                                 <td>{r.placedPackages} / {r.totalPackages}</td>
                                                 <td>{number(r.volumeUtilizationPercent)}%</td>
-                                                <td>{number(r.weightUtilizationPercent ?? r.payloadUtilizationPercent)}%</td>
+                                                <td>{number(r.weightUtilizationPercent ?? r.payloadUtilizationPercent)}%</td><td>{r.approvalStatus || "Pending"}</td>
                                                 <td><button type="button" className="load-add-button" disabled={openingRunId !== null} onClick={() => openRun(r.id)}>{openingRunId === r.id ? "Opening..." : "View"}</button></td>
                                             </tr>
                                         ))}
@@ -270,7 +271,7 @@ export default function LoadOptimizationPage() {
             {response && (
                 <div className="load-results">
                     <div className="load-section-heading load-results-heading">
-                        <div><span className="load-step">04</span><h2>Optimization result{runId ? ` · Run #${runId}` : ""}</h2></div>
+                        <div><span className="load-step">04</span><h2>Optimization result{runId ? ` Â· Run #${runId}` : ""}</h2></div>
                         <span className={`load-result-status ${response.isFeasible ? "feasible" : "partial"}`}>
                             {response.status || (response.isFeasible ? "Feasible" : "Partial load")}
                         </span>
@@ -281,9 +282,10 @@ export default function LoadOptimizationPage() {
                         <Metric label="Payload utilization" value={number(response.payloadUtilizationPercent ?? response.weightUtilizationPercent)} suffix="%" />
                         <Metric label="Remaining payload" value={number(response.remainingPayloadKg)} suffix=" kg" />
                     </div>
+                    <LoadingPlanApprovalPanel runId={runId} response={response} />
                     <div className="load-visual-card">
                         <div className="load-visual-heading">
-                            <div><h2>Interactive 3D loading arrangement</h2><p>Drag to rotate · Scroll to zoom</p></div>
+                            <div><h2>Interactive 3D loading arrangement</h2><p>Drag to rotate Â· Scroll to zoom</p></div>
                             <span>{response.placements?.length || 0} placements</span>
                         </div>
                         <LoadScene3D response={response} />
@@ -295,7 +297,7 @@ export default function LoadOptimizationPage() {
                                 <div className="load-unplaced-list">
                                     {response.unplacedItems.map((x, i) => (
                                         <div className="load-unplaced-item" key={`${x.packageId}-${x.unitNumber}-${i}`}>
-                                            <strong>{x.description || x.packageId} · Unit {x.unitNumber}</strong><span>{x.reason}</span>
+                                            <strong>{x.description || x.packageId} Â· Unit {x.unitNumber}</strong><span>{x.reason}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -316,7 +318,7 @@ export default function LoadOptimizationPage() {
                                         <tr key={`${x.packageId}-${x.unitNumber}-${i}`}>
                                             <td>{x.description || x.packageId}</td><td>{x.unitNumber}</td>
                                             <td>{x.x} / {x.y} / {x.z} cm</td>
-                                            <td>{x.lengthCm} × {x.widthCm} × {x.heightCm} cm</td>
+                                            <td>{x.lengthCm} Ã— {x.widthCm} Ã— {x.heightCm} cm</td>
                                             <td>{x.weightKg} kg</td><td>{x.orientation}</td>
                                         </tr>
                                     ))}
@@ -330,3 +332,5 @@ export default function LoadOptimizationPage() {
         </section>
     );
 }
+
+

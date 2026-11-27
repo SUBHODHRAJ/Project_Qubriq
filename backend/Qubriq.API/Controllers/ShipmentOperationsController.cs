@@ -43,6 +43,35 @@ public class ShipmentOperationsController : ControllerBase
             .AnyAsync(x => x.IsAllowed && x.Permission.Code == permission);
     }
 
+    [HttpGet]
+    public async Task<IActionResult> GetShipments()
+    {
+        if (!await Allowed("shipments.read_all"))
+            return Forbid();
+
+        var items = await _db.Shipments
+            .AsNoTracking()
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .Select(x => new
+            {
+                x.Id,
+                x.TrackingNumber,
+                customer = x.Customer.CompanyName,
+                x.Origin,
+                x.Destination,
+                x.Status,
+                x.CreatedAtUtc,
+                x.ExpectedDeliveryUtc,
+                x.CargoName,
+                x.CargoCategory,
+                x.PackageCount,
+                x.TotalWeightKg,
+                x.IsFragile
+            })
+            .ToListAsync();
+
+        return Ok(items);
+    }
     [HttpGet("{id:long}")]
     public async Task<IActionResult> GetShipment(long id)
     {
@@ -222,3 +251,4 @@ public sealed class UpdateCargoRequest
     public bool IsFragile { get; set; }
     public string? SpecialHandlingRequirements { get; set; }
 }
+

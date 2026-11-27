@@ -1,4 +1,4 @@
-import { apiRequest } from "./apiClient";
+﻿import { apiRequest } from "./apiClient";
 
 const BASE = "/api/fleet";
 
@@ -30,5 +30,9 @@ export const fleetService = {
         method: "POST",
         body: JSON.stringify(data)
     }),
-    getShipments: () => apiRequest("/api/dispatcher/shipments?status=Confirmed")
+    releaseAssignment: (id) => apiRequest(`${BASE}/assignments/${id}/release`, {
+        method: "POST"
+    }),    getShipments: () => apiRequest("/api/dispatcher/shipments?status=Confirmed")
 };
+
+

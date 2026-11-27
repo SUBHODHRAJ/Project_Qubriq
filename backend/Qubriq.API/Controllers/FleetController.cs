@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -310,6 +310,63 @@ public class FleetController : ControllerBase
         return Ok(items);
     }
 
+    [HttpPost("assignments/{id:long}/release")]
+    public async Task<IActionResult> ReleaseAssignment(long id)
+    {
+        if (!await Allowed("fleet.assignments.manage"))
+            return Forbid();
+
+        await using var tx = await _db.Database.BeginTransactionAsync(
+            IsolationLevel.Serializable);
+
+        var assignment = await _db.ShipmentAssignments
+            .Include(x => x.Shipment)
+            .FirstOrDefaultAsync(x => x.Id == id);
+
+        if (assignment == null)
+            return NotFound(new { message = "Assignment not found." });
+
+        if (assignment.Status != "Active" ||
+            assignment.ReleasedAtUtc != null)
+            return Conflict(new { message = "Assignment is already closed." });
+
+        if (assignment.Shipment.Status != "Assigned")
+            return Conflict(new
+            {
+                message = "Only shipments that have not been picked up can be manually released."
+            });
+
+        var releasedAt = DateTime.UtcNow;
+
+        assignment.Status = "Released";
+        assignment.ReleasedAtUtc = releasedAt;
+        assignment.Shipment.Status = "Confirmed";
+
+        _db.AuditLogs.Add(new AuditLog
+        {
+            UserId = UserId(),
+            Action = "SHIPMENT_ASSIGNMENT_RELEASED",
+            EntityType = "Shipment",
+            EntityId = assignment.ShipmentId.ToString(),
+            Details = $"AssignmentId={assignment.Id}; DriverId={assignment.DriverId}; VehicleId={assignment.VehicleId}",
+            CreatedAtUtc = releasedAt
+        });
+
+        await _db.SaveChangesAsync();
+        await tx.CommitAsync();
+
+        return Ok(new
+        {
+            assignment.Id,
+            assignment.ShipmentId,
+            assignment.DriverId,
+            assignment.VehicleId,
+            assignment.Status,
+            assignment.ReleasedAtUtc,
+            shipmentStatus = assignment.Shipment.Status,
+            message = "Assignment released successfully."
+        });
+    }
     [HttpPost("assignments")]
     public async Task<IActionResult> Assign(AssignmentRequest request)
     {
@@ -514,3 +571,4 @@ public sealed class StatusRequest
 {
     public string Status { get; set; } = "";
 }
+

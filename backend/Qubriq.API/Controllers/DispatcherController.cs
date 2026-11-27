@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -267,6 +267,46 @@ public class DispatcherController : ControllerBase
         if (shipment == null)
             return NotFound(new { message = "Shipment not found." });
 
+        // Require an approved, feasible loading plan before cargo pickup.
+        if (target == "PickedUp")
+        {
+            var latestRun = await _db.OptimizationRuns
+                .AsNoTracking()
+                .Where(x => x.ShipmentId == shipment.Id)
+                .OrderByDescending(x => x.CreatedAtUtc)
+                .Select(x => new
+                {
+                    x.Id,
+                    x.IsFeasible
+                })
+                .FirstOrDefaultAsync();
+
+            if (latestRun == null)
+                return Conflict(new
+                {
+                    message = "Dispatch blocked: generate a 3D loading optimization plan before pickup."
+                });
+
+            if (!latestRun.IsFeasible)
+                return Conflict(new
+                {
+                    message = "Dispatch blocked: the latest loading plan is not feasible."
+                });
+
+            var latestDecision = await _db.LoadingPlanApprovals
+                .AsNoTracking()
+                .Where(x => x.OptimizationRunId == latestRun.Id)
+                .OrderByDescending(x => x.ReviewedAtUtc)
+                .Select(x => x.Decision)
+                .FirstOrDefaultAsync();
+
+            if (!string.Equals(latestDecision, "Approved", StringComparison.OrdinalIgnoreCase))
+                return Conflict(new
+                {
+                    message = "Dispatch blocked: the latest loading plan must be approved before pickup."
+                });
+        }
+
         var validTransition =
             (shipment.Status == "Assigned" && target == "PickedUp") ||
             (shipment.Status == "PickedUp" && target == "InTransit") ||
@@ -317,3 +357,4 @@ public sealed class ShipmentStatusRequest
 {
     public string Status { get; set; } = string.Empty;
 }
+
