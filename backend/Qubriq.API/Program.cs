@@ -7,7 +7,12 @@ using Qubriq.API.Authorization;
 using Qubriq.API.Services;
 using Qubriq.API.Services.LoadOptimization;
 
+
+// ... inside your service registration section before builder.Build() ...
+
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddHttpClient<WhatsAppCloudService>();
+
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();

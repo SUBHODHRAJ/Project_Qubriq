@@ -860,6 +860,177 @@ namespace Qubriq.API.Migrations
                     b.ToTable("Vehicles", (string)null);
                 });
 
+            modelBuilder.Entity("Qubriq.API.Models.WhatsAppConversation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<int?>("AssignedDispatcherId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Bsuid")
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("LastCustomerMessageAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("PhoneNumber")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)");
+
+                    b.Property<string>("ProfileName")
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
+
+                    b.Property<int?>("RecipientId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Bsuid");
+
+                    b.HasIndex("PhoneNumber");
+
+                    b.ToTable("WhatsAppConversations");
+                });
+
+            modelBuilder.Entity("Qubriq.API.Models.WhatsAppKnowledgeBase", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<string>("Answer")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Question")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("varchar(300)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("WhatsAppKnowledgeBases");
+                });
+
+            modelBuilder.Entity("Qubriq.API.Models.WhatsAppMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("DeliveryStatus")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("varchar(24)");
+
+                    b.Property<string>("Direction")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("varchar(16)");
+
+                    b.Property<string>("MetaMessageId")
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)");
+
+                    b.Property<string>("SenderType")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("varchar(24)");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("ToolInvoked")
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConversationId");
+
+                    b.HasIndex("MetaMessageId")
+                        .IsUnique();
+
+                    b.ToTable("WhatsAppMessages");
+                });
+
+            modelBuilder.Entity("Qubriq.API.Models.WhatsAppOutbox", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("MessageType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime?>("ProcessedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("RecipientPhone")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)");
+
+                    b.Property<int>("RetryCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("varchar(24)");
+
+                    b.Property<string>("TemplateName")
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("WhatsAppOutboxes");
+                });
+
             modelBuilder.Entity("Qubriq.API.Models.AuditLog", b =>
                 {
                     b.HasOne("Qubriq.API.Models.User", "User")
@@ -1091,6 +1262,17 @@ namespace Qubriq.API.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Qubriq.API.Models.WhatsAppMessage", b =>
+                {
+                    b.HasOne("Qubriq.API.Models.WhatsAppConversation", "Conversation")
+                        .WithMany("Messages")
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Conversation");
+                });
+
             modelBuilder.Entity("Qubriq.API.Models.Customer", b =>
                 {
                     b.Navigation("Shipments");
@@ -1156,6 +1338,11 @@ namespace Qubriq.API.Migrations
                     b.Navigation("Assignments");
 
                     b.Navigation("OptimizationRuns");
+                });
+
+            modelBuilder.Entity("Qubriq.API.Models.WhatsAppConversation", b =>
+                {
+                    b.Navigation("Messages");
                 });
 #pragma warning restore 612, 618
         }

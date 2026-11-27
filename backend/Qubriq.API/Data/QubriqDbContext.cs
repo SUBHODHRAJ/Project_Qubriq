@@ -25,6 +25,11 @@ public class QubriqDbContext : DbContext
     public DbSet<ShipmentRecipient> ShipmentRecipients => Set<ShipmentRecipient>();
     public DbSet<DeliveryProof> DeliveryProofs => Set<DeliveryProof>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<WhatsAppConversation> WhatsAppConversations => Set<WhatsAppConversation>();
+    public DbSet<WhatsAppMessage> WhatsAppMessages => Set<WhatsAppMessage>();
+    public DbSet<WhatsAppOutbox> WhatsAppOutboxes => Set<WhatsAppOutbox>();
+    public DbSet<WhatsAppKnowledgeBase> WhatsAppKnowledgeBases => Set<WhatsAppKnowledgeBase>();
+        
 
     public DbSet<ShipmentPackage> ShipmentPackages => Set<ShipmentPackage>();
     public DbSet<OptimizationRun> OptimizationRuns => Set<OptimizationRun>();
@@ -646,6 +651,18 @@ public class QubriqDbContext : DbContext
                 x.EntityId
             });
         });
+
+        //=====WhatsApp Models=====
+        
+        modelBuilder.Entity<WhatsAppConversation>()
+            .HasIndex(c => c.PhoneNumber);
+
+        modelBuilder.Entity<WhatsAppConversation>()
+            .HasIndex(c => c.Bsuid);
+
+        modelBuilder.Entity<WhatsAppMessage>()
+            .HasIndex(m => m.MetaMessageId)
+            .IsUnique();
     }
 }
 
